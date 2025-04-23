@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read access to all documents for authenticated users
+    match /{document=**} {
+      allow read: if request.auth != null;
+    }
+    
+    // Specific rules for collections
+    
+    // Signals collection - Allow read, but only admin users can write
+    match /signals/{signalId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Positions collection - Allow read, but only admin users can write
+    match /positions/{positionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Config collection - Only admin users can read and write
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+  }
+}
