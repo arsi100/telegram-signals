@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Trading Signals</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h1 class="text-center">Cryptocurrency Trading Signal Application</h1>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <p>This application is running on Firebase Cloud Functions and monitoring cryptocurrency markets to generate trading signals.</p>
+                            <p>Signals are delivered via Telegram during the specified market hours.</p>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h4>Application Status</h4>
+                            <div id="status-container" class="alert alert-secondary">
+                                Checking status...
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h4>Features</h4>
+                            <ul class="list-group">
+                                <li class="list-group-item">Monitors 5-minute candlestick charts on Bybit</li>
+                                <li class="list-group-item">Generates trading signals with confidence scores</li>
+                                <li class="list-group-item">Sends signals via Telegram bot</li>
+                                <li class="list-group-item">Tracks open positions in Firestore</li>
+                                <li class="list-group-item">Runs during optimal market hours</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple status check
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                const statusContainer = document.getElementById('status-container');
+                if (data.status === 'online') {
+                    statusContainer.className = 'alert alert-success';
+                    statusContainer.innerHTML = `
+                        <strong>Status:</strong> Online<br>
+                        <strong>Firebase Connection:</strong> ${data.firebase_connected ? 'Connected' : 'Disconnected'}
+                    `;
+                } else {
+                    statusContainer.className = 'alert alert-danger';
+                    statusContainer.textContent = 'System is offline. Please check the logs.';
+                }
+            })
+            .catch(error => {
+                const statusContainer = document.getElementById('status-container');
+                statusContainer.className = 'alert alert-danger';
+                statusContainer.textContent = 'Failed to get status. Service may be down.';
+                console.error('Error:', error);
+            });
+    </script>
+</body>
+</html>
