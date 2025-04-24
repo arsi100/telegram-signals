@@ -2,7 +2,7 @@ import os
 import logging
 from flask import Flask, render_template, jsonify
 import firebase_admin
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -12,11 +12,12 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "crypto-trading-signals")
 
-# Initialize Firebase Admin SDK
+# Initialize Firebase Admin SDK with service account
 try:
-    firebase_admin.initialize_app()
+    cred = credentials.Certificate('service-account.json')
+    firebase_admin.initialize_app(cred)
     db = firestore.client()
-    logger.info("Firebase initialized successfully")
+    logger.info("Firebase initialized successfully with service account")
 except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}")
     db = None
