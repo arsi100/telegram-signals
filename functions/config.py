@@ -1,43 +1,43 @@
-# Trading pairs to monitor by default
-# This can be overridden from Firestore config
-TRACKED_COINS = [
-    "BTCUSDT",  # Bitcoin
-    "ETHUSDT",  # Ethereum
-    "SOLUSDT",  # Solana
-    "XRPUSDT",   # XRP
-    "AVAXUSDT"  # Avalanche
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Firebase configuration is handled via service-account.json or environment
+GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
+
+# Telegram Bot configuration
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+
+# API Keys for external services
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+CRYPTOCOMPARE_API_KEY = os.environ.get('CRYPTOCOMPARE_API_KEY')
+
+# Trading parameters
+WATCHLIST = [
+    'BTCUSDT',
+    'ETHUSDT',
+    'SOLUSDT',
+    'BNBUSDT',
+    'DOGEUSDT',
+    'XRPUSDT',
+    'ADAUSDT',
+    'AVAXUSDT'
 ]
 
-# Market hours in UTC
-# Format: list of (start_hour, start_minute), (end_hour, end_minute) tuples
-MARKET_HOURS = [
-    # 00:00–02:30
-    ((0, 0), (2, 30)),
-    
-    # 05:30–07:00
-    ((5, 30), (7, 0)),
-    
-    # 07:45–10:00
-    ((7, 45), (10, 0)),
-    
-    # 20:00–23:00
-    ((20, 0), (23, 0)),
-    
-    # 04:00–06:00 next day window
-    ((4, 0), (6, 0))
-]
-
-# Technical Analysis Parameters
-TA_PARAMS = {
-    "rsi_period": 14,
-    "sma_period": 50,
-    "volume_period": 50
+# Market hours configuration (UTC)
+MARKET_HOURS = {
+    'start_hour': 0,  # 24-hour format
+    'end_hour': 23,   # Set to 23 for 24/7 monitoring
+    'active_days': [0, 1, 2, 3, 4, 5, 6]  # 0 = Monday, 6 = Sunday
 }
 
-# Signal Confidence Threshold
-CONFIDENCE_THRESHOLD = 80
+# Cooldown period in minutes
+SIGNAL_COOLDOWN_MINUTES = 15
 
-# Profit and Loss Parameters
-PROFIT_TARGET_PERCENTAGE = 3.0  # 3% profit target
-STOP_LOSS_PERCENTAGE = 2.0     # 2% stop loss
-AVG_DOWN_THRESHOLD = 2.0       # 2% price drop for average down
+# Technical analysis parameters
+RSI_PERIOD = 14
+SMA_PERIOD = 50
+VOLUME_PERIOD = 20

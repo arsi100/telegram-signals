@@ -1,11 +1,13 @@
+import os
+import time
+import json
 import logging
 import requests
-import json
-import time
-from cryptocompare_api import fetch_cryptocompare_kline
+import websocket
+import threading
+from . import config
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def fetch_kline_data(symbol, interval="5", limit=1000, category="linear"):
@@ -22,46 +24,28 @@ def fetch_kline_data(symbol, interval="5", limit=1000, category="linear"):
         List of candlestick data or None on error
     """
     try:
-        url = f"https://api.bybit.com/v5/market/kline"
+        url = "https://api.bybit.com/v5/market/kline"
         params = {
-            "category": category,
             "symbol": symbol,
             "interval": interval,
-            "limit": limit
+            "limit": limit,
+            "category": category
         }
         
         response = requests.get(url, params=params)
+        response.raise_for_status()
+        
         data = response.json()
         
-        if data.get("retCode") == 0 and data.get("result", {}).get("list"):
-            # Bybit returns newest candles first, reverse to get chronological order
-            klines = data["result"]["list"]
-            klines.reverse()
-            
-            # Convert to a more usable format
-            formatted_klines = []
-            for k in klines:
-                formatted_klines.append({
-                    "timestamp": int(k[0]),
-                    "open": float(k[1]),
-                    "high": float(k[2]),
-                    "low": float(k[3]),
-                    "close": float(k[4]),
-                    "volume": float(k[5]),
-                    "turnover": float(k[6])
-                })
-                
-            logger.info(f"Successfully fetched {len(formatted_klines)} klines for {symbol} from Bybit")
-            return formatted_klines
+        if data["retCode"] == 0 and "list" in data["result"]:
+            # Format: [timestamp, open, high, low, close, volume, turnover]
+            return data["result"]["list"]
         else:
-            logger.error(f"Error fetching kline data from Bybit: {data}")
-            # Use backup source
-            return fetch_cryptocompare_kline(symbol.replace("USDT", ""), "USDT")
-    
+            logger.error(f"Failed to fetch kline data: {data.get('retMsg', 'Unknown error')}")
+            return None
     except Exception as e:
-        logger.error(f"Exception in fetch_kline_data for {symbol}: {str(e)}")
-        # Use backup source
-        return fetch_cryptocompare_kline(symbol.replace("USDT", ""), "USDT")
+        logger.error(f"Error fetching kline data: {e}")
+        return None
 
 def setup_websocket_connection(symbols):
     """
@@ -75,16 +59,15 @@ def setup_websocket_connection(symbols):
         This function is provided as an alternative implementation.
         The main application uses the REST API for simplicity.
     """
-    import websocket
-    import threading
     
     def on_message(ws, message):
-        data = json.loads(message)
-        if "topic" in data and data["topic"].startswith("kline.5."):
-            symbol = data["topic"].split(".")[-1]
-            kline = data["data"][0]
-            logger.info(f"Received kline for {symbol}: {kline}")
-            # Process the kline data here
+        try:
+            data = json.loads(message)
+            if "data" in data:
+                logger.info(f"Received kline data: {data['data'][0]}")
+                # Process the real-time data here
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
     
     def on_error(ws, error):
         logger.error(f"WebSocket error: {error}")
@@ -93,24 +76,24 @@ def setup_websocket_connection(symbols):
         logger.info(f"WebSocket closed: {close_status_code} - {close_msg}")
     
     def on_open(ws):
-        logger.info("WebSocket connection opened")
-        # Subscribe to kline topics
-        topics = [f"kline.5.{symbol}" for symbol in symbols]
-        ws.send(json.dumps({
-            "op": "subscribe",
-            "args": topics
-        }))
+        logger.info("WebSocket connection established")
+        # Subscribe to kline data for the symbols
+        for symbol in symbols:
+            ws.send(json.dumps({
+                "op": "subscribe",
+                "args": [f"kline.5.{symbol}"]
+            }))
     
-    websocket_url = "wss://stream.bybit.com/v5/public/linear"
+    # Set up WebSocket connection
     ws = websocket.WebSocketApp(
-        websocket_url,
-        on_open=on_open,
+        "wss://stream.bybit.com/v5/public/linear",
         on_message=on_message,
         on_error=on_error,
         on_close=on_close
     )
+    ws.on_open = on_open
     
-    # Start WebSocket in a new thread
+    # Run WebSocket in a separate thread
     wst = threading.Thread(target=ws.run_forever)
     wst.daemon = True
     wst.start()

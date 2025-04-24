@@ -1,14 +1,10 @@
 import os
 import logging
 import google.generativeai as genai
+from . import config
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-# Initialize Gemini API
-gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
-genai.configure(api_key=gemini_api_key)
 
 def get_confidence_score(pattern_type, rsi, volume_ratio, price, sma):
     """
@@ -24,59 +20,52 @@ def get_confidence_score(pattern_type, rsi, volume_ratio, price, sma):
     Returns:
         Confidence score (0-100)
     """
+    api_key = config.GEMINI_API_KEY
+    
+    if not api_key:
+        logger.warning("Gemini API key not found, using formula-based confidence calculation")
+        return calculate_score_formula(pattern_type, rsi, volume_ratio, price, sma)
+    
     try:
-        # First try to calculate score using the formula if Gemini API fails
-        score = calculate_score_formula(pattern_type, rsi, volume_ratio, price, sma)
+        # Configure the Gemini API
+        genai.configure(api_key=api_key)
         
-        # Now try to get a more nuanced score from Gemini if available
-        if gemini_api_key:
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            
-            # Create a detailed prompt for Gemini
-            prompt = f"""
-            ANALYZE CRYPTO TRADING SIGNAL AND RETURN A NUMERIC CONFIDENCE SCORE (0-100).
-            
-            FACTORS (with weights):
-            * Candlestick pattern ({pattern_type}) - 40% weight
-            * RSI ({rsi:.2f}) - 30% weight
-                - <30 is good for LONG
-                - >70 is good for SHORT
-            * Trading volume ({volume_ratio:.2f}x average) - 20% weight
-                - >1.0 is good
-            * SMA alignment - 10% weight
-                - Price ${price:.2f}, SMA ${sma:.2f}
-                - Price < SMA favors LONG
-                - Price > SMA favors SHORT
-            
-            IMPORTANT: ONLY RETURN A SINGLE NUMBER BETWEEN 0-100.
-            """
-            
-            try:
-                response = model.generate_content(prompt)
-                result = response.text.strip()
-                
-                # Extract the number from the response
-                # Look for a number in the response
-                import re
-                score_match = re.search(r'\b(\d{1,3})\b', result)
-                if score_match:
-                    gemini_score = float(score_match.group(1))
-                    # Validate score is within range
-                    if 0 <= gemini_score <= 100:
-                        logger.info(f"Gemini confidence score: {gemini_score}")
-                        return gemini_score
-                        
-                logger.warning(f"Invalid Gemini score format: {result}. Using formula score.")
-            except Exception as e:
-                logger.error(f"Error querying Gemini API: {str(e)}")
+        # Set up the model
+        model = genai.GenerativeModel('gemini-pro')
         
-        # Return the formula-based score if Gemini fails
-        logger.info(f"Formula-based confidence score: {score}")
-        return score
+        # Create the prompt for analysis
+        prompt = f"""
+        As a trading expert, analyze this technical pattern and provide a confidence score from 0-100.
         
+        Pattern: {pattern_type}
+        RSI: {rsi}
+        Volume ratio (compared to average): {volume_ratio}
+        Price: {price}
+        50 SMA: {sma}
+        Price to SMA ratio: {price/sma if sma else 'N/A'}
+        
+        Provide only a single number as the confidence score (0-100).
+        """
+        
+        # Generate the response
+        response = model.generate_content(prompt)
+        
+        # Parse the confidence score from the response
+        score_text = response.text.strip()
+        
+        # Extract just the number
+        score = ''.join(c for c in score_text if c.isdigit())
+        if score:
+            confidence = min(100, max(0, int(score)))
+            logger.info(f"Calculated confidence with Gemini: {confidence}")
+            return confidence
+        else:
+            logger.warning(f"Failed to extract confidence score from Gemini response: {score_text}")
+            return calculate_score_formula(pattern_type, rsi, volume_ratio, price, sma)
+            
     except Exception as e:
-        logger.error(f"Error in get_confidence_score: {str(e)}")
-        return 50  # Return neutral score on error
+        logger.error(f"Error using Gemini API: {e}")
+        return calculate_score_formula(pattern_type, rsi, volume_ratio, price, sma)
 
 def calculate_score_formula(pattern_type, rsi, volume_ratio, price, sma):
     """
@@ -94,44 +83,34 @@ def calculate_score_formula(pattern_type, rsi, volume_ratio, price, sma):
     Returns:
         Confidence score (0-100)
     """
-    # Pattern score (40%)
-    pattern_score = 40  # Base score if pattern detected
+    # Base score from pattern type
+    base_score = 60
     
-    # RSI score (30%)
-    rsi_score = 0
+    # RSI component (0-20 points)
     if pattern_type == "bullish":
         # For bullish patterns, lower RSI is better (oversold condition)
-        if rsi < 30:
-            rsi_score = 30
-        elif rsi < 40:
-            rsi_score = 20
-        elif rsi < 50:
-            rsi_score = 10
-        else:
-            rsi_score = 0
-    else:  # Bearish
+        rsi_score = max(0, 20 - (rsi / 5)) if rsi <= 50 else max(0, 10 - ((rsi - 50) / 5))
+    else:
         # For bearish patterns, higher RSI is better (overbought condition)
-        if rsi > 70:
-            rsi_score = 30
-        elif rsi > 60:
-            rsi_score = 20
-        elif rsi > 50:
-            rsi_score = 10
+        rsi_score = max(0, 20 - ((100 - rsi) / 5)) if rsi >= 50 else max(0, 10 - ((50 - rsi) / 5))
+    
+    # Volume component (0-15 points)
+    volume_score = min(15, volume_ratio * 10) if volume_ratio > 0 else 0
+    
+    # Price vs SMA component (0-5 points)
+    if sma and sma > 0:
+        ratio = price / sma
+        if pattern_type == "bullish":
+            # For bullish patterns, price below SMA is good
+            price_score = min(5, max(0, 5 * (1 - ratio))) if ratio < 1 else 0
         else:
-            rsi_score = 0
+            # For bearish patterns, price above SMA is good
+            price_score = min(5, max(0, 5 * (ratio - 1))) if ratio > 1 else 0
+    else:
+        price_score = 0
     
-    # Volume score (20%)
-    volume_score = min(20, 20 * volume_ratio)
+    # Calculate final score
+    confidence = min(100, int(base_score + rsi_score + volume_score + price_score))
     
-    # SMA score (10%)
-    sma_score = 0
-    if pattern_type == "bullish" and price < sma:
-        sma_score = 10  # Price below SMA is good for long
-    elif pattern_type == "bearish" and price > sma:
-        sma_score = 10  # Price above SMA is good for short
-    
-    # Calculate total score
-    total_score = pattern_score + rsi_score + volume_score + sma_score
-    
-    # Round to one decimal
-    return round(total_score, 1)
+    logger.info(f"Calculated confidence with formula: {confidence} (Base: {base_score}, RSI: {rsi_score}, Volume: {volume_score}, Price: {price_score})")
+    return confidence
