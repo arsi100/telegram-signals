@@ -1,10 +1,12 @@
 import logging
 import datetime
 import pytz
-from config import MARKET_HOURS
+# Use absolute import for config
+from functions import config
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Remove basicConfig, assume it's handled by the entry point (e.g., main.py or local_test_runner.py)
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def is_market_hours(current_time=None):
@@ -20,55 +22,38 @@ def is_market_hours(current_time=None):
     if current_time is None:
         current_time = datetime.datetime.now(pytz.UTC)
     
-    # Extract hour and minute
+    # Extract hour and day of the week
     hour = current_time.hour
-    minute = current_time.minute
-    current_minutes = hour * 60 + minute
+    # weekday = current_time.weekday() # Monday is 0, Sunday is 6
     
-    # Check each market hour window
-    for start, end in MARKET_HOURS:
-        start_hour, start_minute = start
-        end_hour, end_minute = end
-        
-        start_minutes = start_hour * 60 + start_minute
-        end_minutes = end_hour * 60 + end_minute
-        
-        if start_minutes <= current_minutes <= end_minutes:
-            return True
-    
-    return False
+    # Use config directly
+    start_hour = config.MARKET_HOURS['start_hour']
+    end_hour = config.MARKET_HOURS['end_hour']
+    # active_days = config.MARKET_HOURS['active_days']
 
-def is_in_cooldown_period(symbol, db, cooldown_minutes=15):
-    """
-    Check if a symbol is in cooldown period after a recent signal.
-    
-    Args:
-        symbol: Trading pair symbol
-        db: Firestore database instance
-        cooldown_minutes: Cooldown period in minutes (default: 15)
+    # Check day of week (Removed for now as market is 24/7 in config)
+    # if weekday not in active_days:
+    #     return False
         
-    Returns:
-        Boolean indicating if symbol is in cooldown period
-    """
-    try:
-        # Calculate cooldown timestamp
-        cooldown_timestamp = datetime.datetime.now(pytz.UTC) - datetime.timedelta(minutes=cooldown_minutes)
-        
-        # Query for recent signals
-        signals_query = (
-            db.collection("signals")
-            .where("symbol", "==", symbol)
-            .where("timestamp", ">=", cooldown_timestamp)
-            .limit(1)
-            .get()
-        )
-        
-        # If we have any signals within the cooldown period, return True
-        return len(signals_query) > 0
-        
-    except Exception as e:
-        logger.error(f"Error checking cooldown period for {symbol}: {str(e)}")
-        return False  # Default to allowing signals if we can't check
+    # Check hour (simple check assuming end_hour is within the same day or next day midnight)
+    if start_hour <= end_hour:
+        # Market hours are within a single day (e.g., 9 to 17)
+        is_within_hours = start_hour <= hour <= end_hour
+    else:
+        # Market hours cross midnight (e.g., 22 to 6)
+        is_within_hours = hour >= start_hour or hour <= end_hour
+
+    # Simplified 24/7 check based on current config (0-23)
+    if config.MARKET_HOURS['start_hour'] == 0 and config.MARKET_HOURS['end_hour'] == 23:
+        return True # Always market hours
+
+    # Fallback to previous logic if config changes
+    # This logic needs refinement if MARKET_HOURS includes minutes or complex ranges
+    return is_within_hours 
+
+# --- Removed is_in_cooldown_period as it's now in position_manager.py ---
+# def is_in_cooldown_period(symbol, db, cooldown_minutes=15):
+#     ...
 
 def format_number(number, decimals=2):
     """

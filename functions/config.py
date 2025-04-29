@@ -1,30 +1,36 @@
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables from .env file at the start
+# This makes them available via os.getenv throughout the application
 load_dotenv()
 
-# Firebase configuration is handled via service-account.json or environment
-GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
+# Firebase/Google Cloud configuration
+# GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT') # Old way
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
+# GOOGLE_APPLICATION_CREDENTIALS is used directly by firebase_admin/google libs
+# We ensure it's loaded via load_dotenv() above.
+# GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") # No need to store in config var
 
 # Telegram Bot configuration
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 # API Keys for external services
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-CRYPTOCOMPARE_API_KEY = os.environ.get('CRYPTOCOMPARE_API_KEY')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+CRYPTOCOMPARE_API_KEY = os.getenv('CRYPTOCOMPARE_API_KEY') # Keep loading this if needed
 
 # Trading parameters
-WATCHLIST = [
-    'BTCUSDT',
-    'ETHUSDT',
-    'SOLUSDT',
-    'BNBUSDT',
-    'DOGEUSDT',
-    'XRPUSDT',
-    'ADAUSDT',
-    'AVAXUSDT'
+TRACKED_COINS = [
+    'PF_XBTUSD', # Example Kraken Symbol
+    'PF_ETHUSD',
+    # Add other Kraken perpetual symbols (check Markets endpoint)
+    # 'SOLUSDT', # Bybit format
+    # 'BNBUSDT',
+    # 'DOGEUSDT',
+    # 'XRPUSDT',
+    # 'ADAUSDT',
+    # 'AVAXUSDT'
 ]
 
 # Market hours configuration (UTC)
@@ -40,4 +46,10 @@ SIGNAL_COOLDOWN_MINUTES = 15
 # Technical analysis parameters
 RSI_PERIOD = 14
 SMA_PERIOD = 50
-VOLUME_PERIOD = 20
+VOLUME_PERIOD = 50
+
+# Logging Configuration
+LOG_LEVEL = "INFO" # Default logging level (e.g., DEBUG, INFO, WARNING, ERROR)
+
+# Signal Generation Parameters
+CONFIDENCE_THRESHOLD = 80 # Minimum confidence score (0-100) to generate a signal

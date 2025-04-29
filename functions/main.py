@@ -7,24 +7,38 @@ from firebase_admin import credentials, firestore
 from google.cloud import scheduler_v1
 from google.cloud.scheduler_v1.types import Job, HttpTarget
 
-from config import TRACKED_COINS, MARKET_HOURS
-from signal_generator import process_crypto_data
-from utils import is_market_hours
-from bybit_api import fetch_kline_data
-from telegram_bot import send_telegram_message
+# Use absolute imports for modules within the 'functions' package
+from functions import config
+from functions.signal_generator import process_crypto_data
+# from functions.utils import is_market_hours # Removed market hours check
+# from functions.bybit_api import fetch_kline_data # Use Kraken instead
+from functions.kraken_api import fetch_kline_data # Import from the new Kraken module
+# from functions.telegram_bot import send_telegram_message # Import the specific function
+# Use the new function name that accepts the signal dict
+from functions.telegram_bot import send_telegram_message 
+# Import position manager functions
+from functions.position_manager import save_position, update_position, close_position
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=config.LOG_LEVEL) # REMOVED - Configuration should happen at entry point
+logger = logging.getLogger(__name__) # Get logger for this module
 
 # Initialize Firebase app
-try:
-    firebase_admin.initialize_app()
-    db = firestore.client()
-    logger.info("Firebase initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize Firebase: {e}")
-    db = None
+# --- Initialization moved to entry point (e.g., local_test_runner.py) ---
+# Ensure GOOGLE_APPLICATION_CREDENTIALS env var is set (via .env or system env)
+# before this line is executed. firebase_admin.initialize_app() will automatically use it.
+# try:
+#     firebase_admin.initialize_app()
+#     db = firestore.client()
+#     logger.info("Firebase initialized successfully")
+# except Exception as e:
+#     logger.error(f"Failed to initialize Firebase: {e}")
+#     db = None
+# --- End of commented out block ---
+
+# Global placeholder for db client - MUST be initialized by entry point
+# This isn't ideal practice, passing db would be better, but simplifies refactoring for now
+db = None 
 
 def run_signal_generation(request):
     """
@@ -38,16 +52,15 @@ def run_signal_generation(request):
     """
     logger.info("Starting signal generation process")
     
-    # Check if we're in market hours
-    current_time = datetime.datetime.now(pytz.UTC)
-    if not is_market_hours(current_time):
-        logger.info(f"Not in market hours, skipping. Current time: {current_time.strftime('%H:%M:%S UTC')}")
-        return {"status": "skipped", "reason": "Not in market hours"}
-    
+    # Check if db is valid before proceeding
+    if db is None:
+        logger.error("Firestore database client is not initialized. Exiting.")
+        return {"status": "error", "message": "Firestore not initialized"}
+
     try:
-        # Get coins to track from Firestore
+        # Get coins to track from Firestore - USE PASSED db
         config_doc = db.collection('config').document('trading_pairs').get()
-        coins_to_track = TRACKED_COINS
+        coins_to_track = config.TRACKED_COINS
         if config_doc.exists:
             coins_config = config_doc.to_dict()
             if coins_config and 'pairs' in coins_config:
@@ -65,30 +78,64 @@ def run_signal_generation(request):
                     logger.warning(f"No kline data returned for {coin}")
                     continue
                 
-                # Process data and generate signals
+                # Process data and generate signals - Pass db
                 signal = process_crypto_data(coin, kline_data, db)
                 
-                # If we have a signal, send it
+                # If we have a signal, process it
                 if signal:
                     logger.info(f"Signal generated for {coin}: {signal}")
+                    signal_type = signal.get('type', 'UNKNOWN').upper()
                     
-                    # Prepare message
-                    message = format_signal_message(signal)
+                    # 1. Send Telegram Notification FIRST
+                    # We send notification even if DB operation fails later
+                    if not send_telegram_message(signal):
+                         logger.error(f"Failed to send Telegram notification for {signal_type} signal on {coin}.")
+                         # Continue processing even if Telegram fails?
                     
-                    # Send to Telegram
-                    send_telegram_message(message)
-                    
-                    # Save signal to Firestore
-                    signal_doc = signal.copy()
-                    signal_doc['timestamp'] = firestore.SERVER_TIMESTAMP
-                    db.collection('signals').add(signal_doc)
-                    
+                    # 2. Update Position State in Firestore - Pass db
+                    position_updated = False
+                    try:
+                        if signal_type in ["LONG", "SHORT"]:
+                            position_ref = save_position(signal, db) # Pass db
+                            if position_ref: position_updated = True
+                        elif signal_type.startswith("AVG_DOWN") or signal_type.startswith("AVG_UP"):
+                            if 'position_ref' in signal:
+                                position_updated = update_position(signal['position_ref'], signal, db) # Pass db
+                            else:
+                                logger.error(f"Missing 'position_ref' in {signal_type} signal: {signal}")
+                        elif signal_type == "EXIT":
+                             if 'position_ref' in signal:
+                                 position_updated = close_position(signal['position_ref'], signal['price'], db) # Pass db
+                             else:
+                                 logger.error(f"Missing 'position_ref' in EXIT signal: {signal}")
+                        else:
+                             logger.warning(f"Unknown signal type '{signal_type}' received, cannot update position.")
+                             
+                        if not position_updated:
+                             logger.error(f"Failed to update Firestore for {signal_type} signal on {coin}.")
+                             # Consider how to handle this - retry? alert?
+                             
+                    except Exception as db_err:
+                        logger.exception(f"Database error processing signal {signal_type} for {coin}: {db_err}")
+                        # DB error occurred, notification was already sent.
+
+                    # 3. Log signal to a general signals collection (optional) - Use Passed db
+                    try:
+                        signal_doc = signal.copy()
+                        # Ensure SERVER_TIMESTAMP is used correctly
+                        signal_doc['signal_timestamp'] = firestore.SERVER_TIMESTAMP 
+                        # Remove sensitive or redundant fields if needed before logging
+                        if 'position_ref' in signal_doc: del signal_doc['position_ref'] 
+                        db.collection('signals_log').add(signal_doc) # Use passed db
+                    except Exception as log_err:
+                        logger.error(f"Failed to log signal to signals_log collection: {log_err}")
+
                     signals_generated.append(signal)
                 else:
                     logger.info(f"No signal generated for {coin}")
                     
             except Exception as e:
-                logger.error(f"Error processing {coin}: {str(e)}")
+                logger.error(f"Error processing {coin}: {str(e)}", exc_info=True) # Added exc_info for more detail
         
         return {
             "status": "success", 
@@ -97,45 +144,8 @@ def run_signal_generation(request):
         }
     
     except Exception as e:
-        logger.error(f"Error in run_signal_generation: {str(e)}")
+        logger.error(f"Error in run_signal_generation: {str(e)}", exc_info=True) # Added exc_info
         return {"status": "error", "message": str(e)}
-
-def format_signal_message(signal):
-    """Format a signal as a Telegram message"""
-    signal_type = signal["type"].upper()
-    
-    # Format message differently based on signal type
-    if signal_type in ["LONG", "SHORT"]:
-        message = f"🚨 {signal_type} SIGNAL 🚨\n\n"
-        message += f"Symbol: {signal['symbol']}\n"
-        message += f"Entry Price: ${signal['price']:.2f}\n"
-        message += f"Confidence: {signal['confidence']:.1f}/100\n"
-        
-        # Add profit targets
-        if signal_type == "LONG":
-            take_profit = signal['price'] * 1.03
-            stop_loss = signal['price'] * 0.98
-        else:  # SHORT
-            take_profit = signal['price'] * 0.97
-            stop_loss = signal['price'] * 1.02
-            
-        message += f"Take Profit: ${take_profit:.2f} (3%)\n"
-        message += f"Stop Loss: ${stop_loss:.2f} (2%)\n"
-        
-    elif signal_type == "EXIT":
-        message = f"⚠️ EXIT SIGNAL ⚠️\n\n"
-        message += f"Symbol: {signal['symbol']}\n"
-        message += f"Current Price: ${signal['price']:.2f}\n"
-        message += f"Confidence: {signal['confidence']:.1f}/100\n"
-        
-    elif "AVG_DOWN" in signal_type:
-        position_type = "LONG" if "LONG" in signal_type else "SHORT"
-        message = f"📉 AVERAGE DOWN {position_type} SIGNAL 📉\n\n"
-        message += f"Symbol: {signal['symbol']}\n"
-        message += f"Current Price: ${signal['price']:.2f}\n"
-        message += f"Confidence: {signal['confidence']:.1f}/100\n"
-    
-    return message
 
 def setup_cloud_scheduler(event, context):
     """

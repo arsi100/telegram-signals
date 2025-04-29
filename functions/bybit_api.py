@@ -5,7 +5,7 @@ import logging
 import requests
 import websocket
 import threading
-from . import config
+from functions import config
 
 # Set up logging
 logger = logging.getLogger(__name__)
