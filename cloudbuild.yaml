@@ -22,5 +22,10 @@ availableSecrets:
     env: 'TELEGRAM_CHAT_ID'
   - versionName: projects/$PROJECT_ID/secrets/CRYPTOCOMPARE_API_KEY/versions/latest
     env: 'CRYPTOCOMPARE_API_KEY'
+
+options:
+  logging: CLOUD_LOGGING_ONLY # Or NONE, GCS_ONLY
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+
 # Optional: Specify the service account Cloud Build uses (uses default if omitted)
-# serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...' 
+# serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...'
