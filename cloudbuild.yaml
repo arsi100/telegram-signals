@@ -12,16 +12,16 @@ steps:
     - --region=us-central1 # Deployment region (adjust if needed)
     - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
 
-availableSecrets:
-  secretManager:
-  - versionName: projects/$PROJECT_ID/secrets/GEMINI_API_KEY/versions/latest
-    env: 'GEMINI_API_KEY' # Not strictly needed by function, but good for build context if required
-  - versionName: projects/$PROJECT_ID/secrets/TELEGRAM_BOT_TOKEN/versions/latest
-    env: 'TELEGRAM_BOT_TOKEN'
-  - versionName: projects/$PROJECT_ID/secrets/TELEGRAM_CHAT_ID/versions/latest
-    env: 'TELEGRAM_CHAT_ID'
-  - versionName: projects/$PROJECT_ID/secrets/CRYPTOCOMPARE_API_KEY/versions/latest
-    env: 'CRYPTOCOMPARE_API_KEY'
+# availableSecrets:
+#   secretManager:
+#   - versionName: projects/$PROJECT_ID/secrets/GEMINI_API_KEY/versions/latest
+#     env: 'GEMINI_API_KEY' # Not strictly needed by function, but good for build context if required
+#   - versionName: projects/$PROJECT_ID/secrets/TELEGRAM_BOT_TOKEN/versions/latest
+#     env: 'TELEGRAM_BOT_TOKEN'
+#   - versionName: projects/$PROJECT_ID/secrets/TELEGRAM_CHAT_ID/versions/latest
+#     env: 'TELEGRAM_CHAT_ID'
+#   - versionName: projects/$PROJECT_ID/secrets/CRYPTOCOMPARE_API_KEY/versions/latest
+#     env: 'CRYPTOCOMPARE_API_KEY'
 
 options:
   logging: CLOUD_LOGGING_ONLY # Or NONE, GCS_ONLY
