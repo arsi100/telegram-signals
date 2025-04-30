@@ -3,8 +3,8 @@ import numpy as np
 import talib
 import os # Import os for directory creation
 
-# Use absolute imports
-from functions import config # Import config to access parameters
+# Use relative import for config
+from . import config # Import config to access parameters
 
 # Set up logging
 log_directory = "logs"
