@@ -3,8 +3,8 @@ import logging
 import re # Import regex for parsing
 import google.generativeai as genai
 
-# Use absolute imports
-from functions import config
+# Use relative import for config
+from . import config
 
 # Configure logging
 logger = logging.getLogger(__name__)
