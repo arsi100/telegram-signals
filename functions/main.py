@@ -23,19 +23,6 @@ from functions.position_manager import save_position, update_position, close_pos
 # logging.basicConfig(level=config.LOG_LEVEL) # REMOVED - Configuration should happen at entry point
 logger = logging.getLogger(__name__) # Get logger for this module
 
-# Initialize Firebase app
-# --- Initialization moved to entry point (e.g., local_test_runner.py) ---
-# Ensure GOOGLE_APPLICATION_CREDENTIALS env var is set (via .env or system env)
-# before this line is executed. firebase_admin.initialize_app() will automatically use it.
-# try:
-#     firebase_admin.initialize_app()
-#     db = firestore.client()
-#     logger.info("Firebase initialized successfully")
-# except Exception as e:
-#     logger.error(f"Failed to initialize Firebase: {e}")
-#     db = None
-# --- End of commented out block ---
-
 # Global placeholder for db client - MUST be initialized by entry point
 # This isn't ideal practice, passing db would be better, but simplifies refactoring for now
 db = None 
@@ -52,10 +39,31 @@ def run_signal_generation(request):
     """
     logger.info("Starting signal generation process")
     
+    # Initialize Firebase HERE if not already initialized
+    # This needs to be done within the function scope for Cloud Functions
+    global db
+    if db is None:
+        try:
+            # Check if already initialized (can happen with warm instances)
+            # It's generally safe to call initialize_app multiple times
+            # if no name is provided, it initializes the default app.
+            # Let's just attempt initialization directly.
+            if not firebase_admin._apps: # Only initialize if default app doesn't exist
+                firebase_admin.initialize_app()
+            db = firestore.client()
+            logger.info("Firebase initialized successfully within function")
+        except Exception as e:
+            logger.error(f"Failed to initialize Firebase: {e}")
+            db = None # Ensure db is None if init fails
+
     # Check if db is valid before proceeding
     if db is None:
         logger.error("Firestore database client is not initialized. Exiting.")
-        return {"status": "error", "message": "Firestore not initialized"}
+        # Return an error status code for Cloud Run/Functions
+        # Use Flask standard tuple return for response + status code
+        return ("Firestore not initialized", 500) 
+        
+    logger.info("Firestore client seems initialized.") # Added log
 
     try:
         # Get coins to track from Firestore - USE PASSED db
