@@ -7,17 +7,18 @@ from firebase_admin import credentials, firestore
 from google.cloud import scheduler_v1
 from google.cloud.scheduler_v1.types import Job, HttpTarget
 
-# Use absolute imports for modules within the 'functions' package
-from functions import config
-from functions.signal_generator import process_crypto_data
-# from functions.utils import is_market_hours # Removed market hours check
-# from functions.bybit_api import fetch_kline_data # Use Kraken instead
-from functions.kraken_api import fetch_kline_data # Import from the new Kraken module
-# from functions.telegram_bot import send_telegram_message # Import the specific function
+# Use relative imports for modules within the 'functions' directory
+# because --source=./functions puts these files at the root of /workspace
+from . import config
+from .signal_generator import process_crypto_data
+# from .utils import is_market_hours # Removed market hours check
+# from .bybit_api import fetch_kline_data # Use Kraken instead
+from .kraken_api import fetch_kline_data # Import from the new Kraken module
+# from .telegram_bot import send_telegram_message # Import the specific function
 # Use the new function name that accepts the signal dict
-from functions.telegram_bot import send_telegram_message 
+from .telegram_bot import send_telegram_message 
 # Import position manager functions
-from functions.position_manager import save_position, update_position, close_position
+from .position_manager import save_position, update_position, close_position
 
 # Set up logging
 # logging.basicConfig(level=config.LOG_LEVEL) # REMOVED - Configuration should happen at entry point
