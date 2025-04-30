@@ -7,7 +7,7 @@ steps:
     - run_signal_generation  # Your function name
     - --source=./functions  # Directory containing your function code relative to root
     - --entry-point=run_signal_generation # Python function to execute
-    - --runtime=python312  # Supported Python runtime
+    - --runtime=python311  # Supported Python runtime (Changed from 3.12 for TA-Lib wheel)
     - --trigger-http       # Trigger via HTTP (for Cloud Scheduler)
     - --region=us-central1 # Deployment region (adjust if needed)
     - --no-allow-unauthenticated # Explicitly disallow public access
