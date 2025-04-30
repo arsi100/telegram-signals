@@ -1,8 +1,8 @@
 import logging
 import datetime
 import pytz
-# Use absolute import for config
-from functions import config
+# Use relative import for config
+from . import config
 
 # Set up logging
 # Remove basicConfig, assume it's handled by the entry point (e.g., main.py or local_test_runner.py)
