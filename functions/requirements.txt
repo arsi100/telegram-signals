@@ -136,8 +136,8 @@ requests==2.31.0
 rsa==4.9.1
     # via google-auth
 TA-Lib-Precompiled==0.4.25
-tensorflow==2.18.1rc0
-tensorflow-datasets==4.9.6
+# tensorflow==2.18.1rc0 # Removed as unused
+# tensorflow-datasets==4.9.6 # Removed as unused
 tqdm==4.67.1
     # via google-generativeai
 typing-extensions==4.13.2
