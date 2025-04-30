@@ -11,7 +11,7 @@ steps:
     - --trigger-http       # Trigger via HTTP (for Cloud Scheduler)
     - --region=us-central1 # Deployment region (adjust if needed)
     - --no-allow-unauthenticated # Explicitly disallow public access
-    # - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
+    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
     # - --build-service-account=service-777440185914@gcp-sa-cloudbuild.iam.gserviceaccount.com # Explicitly set build service account
 
 # availableSecrets:
