@@ -87,7 +87,7 @@ idna==3.10
     # via requests
 msgpack==1.1.0
     # via cachecontrol
-numpy==2.2.5
+numpy==1.26.4
     # via
     #   repl-nix-workspace (pyproject.toml)
     #   ta-lib
