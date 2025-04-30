@@ -2,12 +2,12 @@ import logging
 import datetime
 import pytz
 
-# Use absolute imports
-from functions.technical_analysis import analyze_technicals
-from functions.confidence_calculator import get_confidence_score
-from functions.position_manager import get_open_position, is_in_cooldown_period
-from functions.utils import is_market_hours # Assuming utils.py exists and is needed
-from functions import config
+# Use relative imports
+from .technical_analysis import analyze_technicals
+from .confidence_calculator import get_confidence_score
+from .position_manager import get_open_position, is_in_cooldown_period
+from .utils import is_market_hours # Assuming utils.py exists and is needed
+from . import config
 
 # Set up logging
 logger = logging.getLogger(__name__)
