@@ -31,3 +31,4 @@ options:
 
 # Optional: Specify the service account Cloud Build uses (uses default if omitted)
 # serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...'
+# Triggering build after Org Policy update.
