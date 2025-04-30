@@ -39,12 +39,12 @@ def convert_klines_to_numpy(kline_data):
 def calculate_rsi(kline_data, return_all=False):
     """
     Calculate Relative Strength Index (RSI).
-
+    
     Args:
         kline_data: List of candlestick data dictionaries.
         return_all: If True, return the full array of RSI values. 
                     If False, return only the latest RSI value.
-
+        
     Returns:
         Latest RSI value (float), the full RSI numpy array, or None on error.
         Returns neutral RSI (50.0) if only latest is requested and error occurs.
@@ -73,12 +73,12 @@ def calculate_rsi(kline_data, return_all=False):
 def calculate_sma(kline_data, return_all=False):
     """
     Calculate Simple Moving Average (SMA).
-
+    
     Args:
         kline_data: List of candlestick data dictionaries.
         return_all: If True, return the full array of SMA values. 
                     If False, return only the latest SMA value.
-
+        
     Returns:
         Latest SMA value (float), the full SMA numpy array, or None on error.
         Returns last close price if only latest is requested and error occurs.
@@ -108,12 +108,12 @@ def calculate_sma(kline_data, return_all=False):
 def analyze_volume(kline_data, return_all=False):
     """
     Analyze trading volume, calculating average volume and identifying high volume periods.
-
+    
     Args:
         kline_data: List of candlestick data dictionaries.
         return_all: If True, return dictionary of arrays (current, avg, ratio, high_volume_bool).
                     If False, return dictionary of latest values.
-
+        
     Returns:
         Dictionary containing volume analysis results, or None on error.
         Returns default values if only latest is requested and error occurs.
@@ -377,7 +377,7 @@ def detect_candlestick_patterns(
                 logger.info(f"Latest confirmed patterns (at index -2): {', '.join(detected)}")
                 
             return latest_results
-            
+        
     except Exception as e:
         logger.error(f"Error detecting confirmed candlestick patterns: {e}")
         return default_result_all if return_all else default_result_latest
