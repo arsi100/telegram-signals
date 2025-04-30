@@ -2,7 +2,7 @@ import logging
 from firebase_admin import firestore
 import datetime
 import pytz
-from functions import config # Import config for cooldown period
+from . import config # Import config for cooldown period
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
