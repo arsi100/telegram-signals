@@ -2,7 +2,7 @@ import os
 import requests
 import logging
 import re # For Markdown escaping
-from functions import config
+from . import config
 
 # Configure logging - Handled by basicConfig in technical_analysis.py or main entry point
 logger = logging.getLogger(__name__)
