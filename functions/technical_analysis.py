@@ -401,6 +401,21 @@ def analyze_technicals(kline_data):
         Returns None if critical errors occur or insufficient data for basic analysis.
     """
     
+    # ---- ADDED DEBUG LOG ----
+    kline_len = len(kline_data) if kline_data else 0
+    logger.debug(f"analyze_technicals received {kline_len} klines.")
+    if not kline_data or kline_len == 0:
+        logger.error("analyze_technicals received empty or no kline_data. Cannot proceed.")
+        return None # Explicitly return None if no data
+    # ---- END DEBUG LOG ----
+
+    # Ensure we have enough data before proceeding with conversions/calculations
+    # Define minimum length based on longest period needed (e.g., SMA_PERIOD or VOLUME_PERIOD)
+    min_required_length = max(config.SMA_PERIOD, config.VOLUME_PERIOD, config.RSI_PERIOD) + 1 # Add buffer
+    if kline_len < min_required_length:
+        logger.error(f"Insufficient data for analysis. Received {kline_len}, need at least {min_required_length}.")
+        return None
+
     results = {
         "rsi": 50.0, # Default neutral
         "sma": None,
@@ -409,10 +424,6 @@ def analyze_technicals(kline_data):
         "latest_close": None
     }
     
-    if not kline_data:
-        logger.error("analyze_technicals: Received empty kline data.")
-        return None
-        
     results['latest_close'] = kline_data[-1]['close']
     results['sma'] = results['latest_close'] # Default SMA to latest close
 

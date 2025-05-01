@@ -76,9 +76,15 @@ def fetch_kline_data(symbol: str):
                        logger.warning(f"Skipping malformed kline data point: {kline}")
              
              # Sort by timestamp ascending just in case API doesn't guarantee order
-             processed_klines.sort(key=lambda x: x['timestamp']) 
+             processed_klines.sort(key=lambda x: x['timestamp'])
              
              logger.info(f"Successfully processed {len(processed_klines)} kline data points for {symbol}")
+             # ---- ADDED DEBUG LOG ----
+             if processed_klines:
+                 logger.debug(f"Last processed kline for {symbol}: {processed_klines[-1]}")
+             else:
+                 logger.debug(f"Processed klines list is empty for {symbol}.")
+             # ---- END DEBUG LOG ----
              return processed_klines
         else:
              logger.error(f"Unexpected response structure from Kraken API for {symbol}. 'candles' key missing or not a list. Response: {data}")
