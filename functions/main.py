@@ -87,6 +87,10 @@ def run_signal_generation(request):
                     logger.warning(f"No kline data returned for {coin}")
                     continue
                 
+                # ---- ADDED DEBUG LOG ----
+                logger.debug(f"Passing {len(kline_data)} klines to process_crypto_data for {coin}")
+                # ---- END DEBUG LOG ----
+                
                 # Process data and generate signals - Pass db
                 signal = process_crypto_data(coin, kline_data, db)
                 
