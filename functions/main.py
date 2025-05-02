@@ -1,28 +1,38 @@
 #!/usr/bin/env python
-import logging
-import datetime
-import time
-import pytz
-import firebase_admin
-from firebase_admin import firestore # Uncommented
-# from google.cloud import scheduler_v1 # Commented out
-# from google.cloud.scheduler_v1.types import Job, HttpTarget # Commented out
+# Try importing core modules first and log any errors
+try:
+    import logging
+    import datetime
+    import time
+    import pytz
+    import firebase_admin
+    from firebase_admin import firestore
+    print("Successfully imported core libraries") # Use print for early feedback
+except ImportError as e:
+    print(f"CRITICAL: Failed to import core libraries: {e}")
+    # If core libs fail, the function likely can't proceed
+    raise # Re-raise the exception to ensure failure
 
-# Use relative imports for modules within the 'functions' directory
-# because --source=./functions puts these files at the root of /workspace
-from . import config # Uncommented
-from .signal_generator import process_crypto_data # Uncommented
-# from .utils import is_market_hours # Removed market hours check
-# from .bybit_api import fetch_kline_data # Use Kraken instead
-from .kraken_api import fetch_kline_data # Uncommented
-# from .telegram_bot import send_telegram_message # Import the specific function
-# Use the new function name that accepts the signal dict
-from .telegram_bot import send_telegram_message # Uncommented
-# Import position manager functions
-from .position_manager import save_position, update_position, close_position # Uncommented
+# Try importing local/application modules
+try:
+    from . import config
+    from .signal_generator import process_crypto_data
+    from .kraken_api import fetch_kline_data
+    from .telegram_bot import send_telegram_message
+    from .position_manager import save_position, update_position, close_position
+    print("Successfully imported application modules") # Use print
+except ImportError as e:
+    print(f"CRITICAL: Failed to import application modules: {e}")
+    # Log the error before potentially failing
+    # Get a logger instance here just in case logging *partially* works
+    try:
+        logger_init_fail = logging.getLogger(__name__)
+        logger_init_fail.error(f"Failed to import application modules: {e}", exc_info=True)
+    except Exception as log_e:
+        print(f"Also failed to get logger during import error: {log_e}")
+    raise # Re-raise the exception
 
-# Set up logging
-# logging.basicConfig(level=config.LOG_LEVEL) # Keep commented - Handled below
+# Set up logging *after* successful imports
 logger = logging.getLogger(__name__)
 
 # Global placeholder for db client - MUST be initialized by entry point
