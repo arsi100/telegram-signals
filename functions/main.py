@@ -38,18 +38,25 @@ def run_signal_generation(request):
     Returns:
         HTTP response
     """
-    # --- ADDED LOGGING CONFIGURATION ---
-    # Set root logger level to DEBUG to capture all logs
-    # Note: Cloud Logging handler automatically set up by Functions Framework
-    logging.getLogger().setLevel(logging.DEBUG)
+    # --- ALTERNATIVE LOGGING CONFIGURATION (Testing) ---
+    # Use basicConfig to set level AND ensure a handler is set up
+    # Force=True ensures it reconfigures even if already configured elsewhere (less likely here)
+    # Level=DEBUG to capture all logs
+    logging.basicConfig(level=logging.DEBUG, force=True)
     # --- END LOGGING CONFIGURATION ---
-    
+
+    # --- ADDED VERY EARLY LOG ---
+    # Let's see if the function even starts
+    logger.info("--- run_signal_generation function START ---")
+    # --- END EARLY LOG ---
+
     logger.info("Starting signal generation process")
     
     # Initialize Firebase HERE if not already initialized
     # This needs to be done within the function scope for Cloud Functions
     global db
     if db is None:
+        logger.debug("Attempting Firebase initialization...") # Added debug
         try:
             # Check if already initialized (can happen with warm instances)
             # It's generally safe to call initialize_app multiple times
@@ -59,8 +66,10 @@ def run_signal_generation(request):
             else:
                 logger.info("Firebase Admin SDK already initialized.")
             db = firestore.client()
+            logger.debug("Firestore client obtained successfully.") # Added debug
         except Exception as e:
-            logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
+            # Log the error BEFORE returning
+            logger.error(f"Failed to initialize Firebase Admin SDK: {e}", exc_info=True) # Added exc_info
             return ("Error initializing Firebase", 500) # Stop execution if Firebase fails
 
     # --- Existing code continues below --- 
