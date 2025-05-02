@@ -43,7 +43,7 @@ def run_signal_generation(request):
     # Use basicConfig to set level AND ensure a handler is set up
     # Force=True ensures it reconfigures even if already configured elsewhere (less likely here)
     # Level=DEBUG to capture all logs
-    logging.basicConfig(level=logging.DEBUG, force=True)
+    # logging.basicConfig(level=logging.DEBUG, force=True) # REMOVED FOR TEST
     # --- END LOGGING CONFIGURATION ---
 
     # --- ADDED VERY EARLY LOG ---
