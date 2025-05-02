@@ -138,6 +138,26 @@ def run_signal_generation(request):
     logger.info("--- Simplified function execution END ---")
     return ("Simplified function ran successfully", 200)
 
+# === NEW TEST ENDPOINT ===
+def test_endpoint(request):
+    """
+    Minimal test endpoint to check basic function execution.
+    """
+    # Try basic logging
+    try:
+        # Get a logger specific to this test function
+        test_logger = logging.getLogger('test_endpoint')
+        # Ensure logging is configured (using basicConfig for simplicity here)
+        logging.basicConfig(level=logging.INFO, force=True)
+        test_logger.info("--- test_endpoint START --- ")
+        test_logger.info("--- test_endpoint END --- ")
+        return ("Test endpoint executed successfully!", 200)
+    except Exception as e:
+        # Fallback if logging itself fails
+        print(f"Error in test_endpoint logging: {e}") 
+        return ("Test endpoint hit, but logging failed.", 500)
+# === END TEST ENDPOINT ===
+
 # def setup_cloud_scheduler(event, context):
 #     """
 #     Cloud Function to set up the Cloud Scheduler jobs.

@@ -6,7 +6,7 @@ steps:
     - deploy
     - run_signal_generation  # Your function name
     - --source=./functions  # Directory containing your function code relative to root
-    - --entry-point=run_signal_generation # Python function to execute
+    - --entry-point=test_endpoint # Python function to execute (CHANGED FOR TESTING)
     - --runtime=python311  # Supported Python runtime (Changed from 3.12 for TA-Lib wheel)
     - --trigger-http       # Trigger via HTTP (for Cloud Scheduler)
     - --region=us-central1 # Deployment region (adjust if needed)
