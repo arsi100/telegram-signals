@@ -17,7 +17,6 @@ steps:
     - --timeout=300s       # Function execution timeout (adjust if needed, max 3600s for gen2 HTTP)
     - --min-instances=0    # Minimum instances (0 for cost savings)
     - --max-instances=2    # Maximum instances (adjust based on expected load)
-    - --allow-unauthenticated # Allow HTTP requests without authentication (Necessary for public URLs)
     # NOTE: secrets are now passed via the trigger configuration, not here.
     # - --set-secrets=/secrets/GEMINI_API_KEY=GEMINI_API_KEY:latest,/secrets/TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,/secrets/TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,/secrets/CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
 
@@ -41,3 +40,8 @@ options:
 # Optional: Specify the service account Cloud Build uses (uses default if omitted)
 # serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...'
 # Triggering build after Org Policy update.
+
+# Allow unauthenticated access (adjust if needed, e.g., for internal services)
+#    - --allow-unauthenticated # REMOVED - Use OIDC service account for Scheduler
+
+# Trigger rebuild comment
