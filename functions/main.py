@@ -146,11 +146,13 @@ def test_endpoint(request):
     # Try basic logging
     try:
         # Get a logger specific to this test function
-        test_logger = logging.getLogger('test_endpoint')
+        # test_logger = logging.getLogger('test_endpoint') # Using print instead
         # Ensure logging is configured (using basicConfig for simplicity here)
-        logging.basicConfig(level=logging.INFO, force=True)
-        test_logger.info("--- test_endpoint START --- ")
-        test_logger.info("--- test_endpoint END --- ")
+        # logging.basicConfig(level=logging.INFO, force=True) # Using print instead
+        # test_logger.info("--- test_endpoint START --- ")
+        # test_logger.info("--- test_endpoint END --- ")
+        print("--- test_endpoint START (using print) ---")
+        print("--- test_endpoint END (using print) ---")
         return ("Test endpoint executed successfully!", 200)
     except Exception as e:
         # Fallback if logging itself fails
