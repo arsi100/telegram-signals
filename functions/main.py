@@ -38,6 +38,12 @@ def run_signal_generation(request):
     Returns:
         HTTP response
     """
+    # --- ADDED LOGGING CONFIGURATION ---
+    # Set root logger level to DEBUG to capture all logs
+    # Note: Cloud Logging handler automatically set up by Functions Framework
+    logging.getLogger().setLevel(logging.DEBUG)
+    # --- END LOGGING CONFIGURATION ---
+    
     logger.info("Starting signal generation process")
     
     # Initialize Firebase HERE if not already initialized
@@ -47,118 +53,75 @@ def run_signal_generation(request):
         try:
             # Check if already initialized (can happen with warm instances)
             # It's generally safe to call initialize_app multiple times
-            # if no name is provided, it initializes the default app.
-            # Let's just attempt initialization directly.
-            if not firebase_admin._apps: # Only initialize if default app doesn't exist
-                firebase_admin.initialize_app()
+            if not firebase_admin._apps:
+                 firebase_admin.initialize_app()
+                 logger.info("Firebase Admin SDK initialized.")
+            else:
+                logger.info("Firebase Admin SDK already initialized.")
             db = firestore.client()
-            logger.info("Firebase initialized successfully within function")
         except Exception as e:
-            logger.error(f"Failed to initialize Firebase: {e}")
-            db = None # Ensure db is None if init fails
+            logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
+            return ("Error initializing Firebase", 500) # Stop execution if Firebase fails
 
-    # Check if db is valid before proceeding
-    if db is None:
-        logger.error("Firestore database client is not initialized. Exiting.")
-        # Return an error status code for Cloud Run/Functions
-        # Use Flask standard tuple return for response + status code
-        return ("Firestore not initialized", 500) 
-        
-    logger.info("Firestore client seems initialized.") # Added log
+    # --- Existing code continues below --- 
+    # ---- ADDED DEBUG LOG ----
+    logger.debug(f"Firestore client obtained: {db}") 
+    # ---- END DEBUG LOG ----
 
-    try:
-        # Get coins to track from Firestore - USE PASSED db
-        config_doc = db.collection('config').document('trading_pairs').get()
-        coins_to_track = config.TRACKED_COINS
-        if config_doc.exists:
-            coins_config = config_doc.to_dict()
-            if coins_config and 'pairs' in coins_config:
-                coins_to_track = coins_config['pairs']
+    # Fetch list of coins to process from config
+    coins_to_process = config.COINS_TO_PROCESS
+    logger.info(f"Processing coins: {coins_to_process}")
 
-        signals_generated = []
-        
-        # Process each coin
-        for coin in coins_to_track:
-            logger.info(f"Processing {coin}")
-            try:
-                # Fetch kline data
-                kline_data = fetch_kline_data(coin)
-                if not kline_data:
-                    logger.warning(f"No kline data returned for {coin}")
-                    continue
-                
-                # ---- ADDED DEBUG LOG ----
-                logger.debug(f"Passing {len(kline_data)} klines to process_crypto_data for {coin}")
-                # ---- END DEBUG LOG ----
-                
-                # Process data and generate signals - Pass db
-                signal = process_crypto_data(coin, kline_data, db)
-                
-                # If we have a signal, process it
-                if signal:
-                    logger.info(f"Signal generated for {coin}: {signal}")
-                    signal_type = signal.get('type', 'UNKNOWN').upper()
-                    
-                    # 1. Send Telegram Notification FIRST
-                    # We send notification even if DB operation fails later
-                    if not send_telegram_message(signal):
-                         logger.error(f"Failed to send Telegram notification for {signal_type} signal on {coin}.")
-                         # Continue processing even if Telegram fails?
-                    
-                    # 2. Update Position State in Firestore - Pass db
-                    position_updated = False
-                    try:
-                        if signal_type in ["LONG", "SHORT"]:
-                            position_ref = save_position(signal, db) # Pass db
-                            if position_ref: position_updated = True
-                        elif signal_type.startswith("AVG_DOWN") or signal_type.startswith("AVG_UP"):
-                            if 'position_ref' in signal:
-                                position_updated = update_position(signal['position_ref'], signal, db) # Pass db
-                            else:
-                                logger.error(f"Missing 'position_ref' in {signal_type} signal: {signal}")
-                        elif signal_type == "EXIT":
-                             if 'position_ref' in signal:
-                                 position_updated = close_position(signal['position_ref'], signal['price'], db) # Pass db
-                             else:
-                                 logger.error(f"Missing 'position_ref' in EXIT signal: {signal}")
-                        else:
-                             logger.warning(f"Unknown signal type '{signal_type}' received, cannot update position.")
-                             
-                        if not position_updated:
-                             logger.error(f"Failed to update Firestore for {signal_type} signal on {coin}.")
-                             # Consider how to handle this - retry? alert?
-                             
-                    except Exception as db_err:
-                        logger.exception(f"Database error processing signal {signal_type} for {coin}: {db_err}")
-                        # DB error occurred, notification was already sent.
+    for coin in coins_to_process:
+        try:
+            logger.info(f"--- Processing {coin} ---")
+            # Check cooldown period before fetching data
+            if is_in_cooldown_period(coin, db):
+                logger.info(f"Skipping {coin} due to cooldown period.")
+                continue
 
-                    # 3. Log signal to a general signals collection (optional) - Use Passed db
-                    try:
-                        signal_doc = signal.copy()
-                        # Ensure SERVER_TIMESTAMP is used correctly
-                        signal_doc['signal_timestamp'] = firestore.SERVER_TIMESTAMP 
-                        # Remove sensitive or redundant fields if needed before logging
-                        if 'position_ref' in signal_doc: del signal_doc['position_ref'] 
-                        db.collection('signals_log').add(signal_doc) # Use passed db
-                    except Exception as log_err:
-                        logger.error(f"Failed to log signal to signals_log collection: {log_err}")
+            # Fetch kline data for the coin
+            # Using Kraken API as per current implementation
+            kline_data = fetch_kline_data(coin)
+            if not kline_data:
+                 logger.warning(f"No kline data returned for {coin}")
+                 continue
+            
+            # ---- ADDED DEBUG LOG ----
+            logger.debug(f"Passing {len(kline_data)} klines to process_crypto_data for {coin}")
+            # ---- END DEBUG LOG ----
+            
+            # Process data and generate signals - Pass db
+            signal = process_crypto_data(coin, kline_data, db)
+            
+            if signal:
+                logger.info(f"Signal generated for {coin}: {signal['type']} at {signal['price']}")
+                # Check confidence score
+                confidence_score = get_confidence_score(
+                    coin,
+                    signal['type'],
+                    signal['rsi'],
+                    signal['sma_trend'],
+                    signal['patterns']
+                )
+                signal['confidence_score'] = confidence_score
+                logger.info(f"Confidence score for {coin} signal: {confidence_score}")
 
-                    signals_generated.append(signal)
+                if confidence_score >= config.CONFIDENCE_THRESHOLD:
+                    # Save position and send notification only if confidence is high enough
+                    save_position(signal, db)
+                    send_telegram_message(signal) 
                 else:
-                    logger.info(f"No signal generated for {coin}")
-                    
-            except Exception as e:
-                logger.error(f"Error processing {coin}: {str(e)}", exc_info=True) # Added exc_info for more detail
-        
-        return {
-            "status": "success", 
-            "signals": len(signals_generated),
-            "coins_processed": len(coins_to_track)
-        }
-    
-    except Exception as e:
-        logger.error(f"Error in run_signal_generation: {str(e)}", exc_info=True) # Added exc_info
-        return {"status": "error", "message": str(e)}
+                    logger.info(f"Signal for {coin} did not meet confidence threshold ({confidence_score} < {config.CONFIDENCE_THRESHOLD}). Discarding.")
+            else:
+                logger.info(f"No signal generated for {coin}")
+
+        except Exception as e:
+            logger.error(f"Error processing {coin}: {e}", exc_info=True)
+            # Continue to the next coin even if one fails
+
+    logger.info("Signal generation process completed")
+    return ("Signal generation process completed", 200)
 
 def setup_cloud_scheduler(event, context):
     """
