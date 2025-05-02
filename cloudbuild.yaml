@@ -6,13 +6,20 @@ steps:
     - deploy
     - run_signal_generation  # Your function name
     - --source=./functions  # Directory containing your function code relative to root
-    - --entry-point=test_endpoint # Python function to execute (CHANGED FOR TESTING)
-    - --runtime=python311  # Supported Python runtime (Changed from 3.12 for TA-Lib wheel)
+    - --entry-point=run_signal_generation # Python function to execute (REVERTED)
+    - --runtime=python310  # EXPLICITLY SET TO PYTHON 3.10 FOR TESTING
     - --trigger-http       # Trigger via HTTP (for Cloud Scheduler)
     - --region=us-central1 # Deployment region (adjust if needed)
-    - --no-allow-unauthenticated # Explicitly disallow public access
-    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
-    # - --build-service-account=service-777440185914@gcp-sa-cloudbuild.iam.gserviceaccount.com # Explicitly set build service account
+    - --project=telegram-signals-205cc # Explicitly specify project ID
+    - --gen2               # Use Cloud Functions (2nd gen) backed by Cloud Run
+    - --memory=256M        # Memory allocation (adjust if needed)
+    - --cpu=1              # CPU allocation (scaled down, adjust if needed, 0.1666 minimum for some ops)
+    - --timeout=300s       # Function execution timeout (adjust if needed, max 3600s for gen2 HTTP)
+    - --min-instances=0    # Minimum instances (0 for cost savings)
+    - --max-instances=2    # Maximum instances (adjust based on expected load)
+    - --allow-unauthenticated # Allow HTTP requests without authentication (Necessary for public URLs)
+    # NOTE: secrets are now passed via the trigger configuration, not here.
+    # - --set-secrets=/secrets/GEMINI_API_KEY=GEMINI_API_KEY:latest,/secrets/TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,/secrets/TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,/secrets/CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
 
 # availableSecrets:
 #   secretManager:
@@ -26,8 +33,10 @@ steps:
 #     env: 'CRYPTOCOMPARE_API_KEY'
 
 options:
-  logging: CLOUD_LOGGING_ONLY # Or NONE, GCS_ONLY
-  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+  logging: CLOUD_LOGGING_ONLY # Use Cloud Logging for build logs
+  # Required for user-managed trigger service account
+  dynamicSubstitutions: true # Allows use of variables like $PROJECT_ID
+  # defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET # No - use default
 
 # Optional: Specify the service account Cloud Build uses (uses default if omitted)
 # serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...'
