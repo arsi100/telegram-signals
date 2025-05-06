@@ -20,6 +20,7 @@ cryptography==44.0.2
     # via pyjwt
 firebase-admin==6.8.0
     # via repl-nix-workspace (pyproject.toml)
+functions-framework>=3.0.0,<4.0.0
 google-ai-generativelanguage==0.6.15
     # via google-generativeai
 google-api-core[grpc]==2.25.0rc0
