@@ -39,113 +39,95 @@ logger = logging.getLogger(__name__)
 # This isn't ideal practice, passing db would be better, but simplifies refactoring for now
 db = None
 
+print("***** TOP LEVEL PRINT: main.py loaded *****") # ADDED FOR DEBUGGING
+
+# Add functions directory to sys.path to allow absolute imports for deployment
+# functions_dir = os.path.dirname(__file__)
+# if functions_dir not in sys.path:
+#     sys.path.append(functions_dir)
+
+# Configure logging
+# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
+# logging.getLogger().setLevel(logging.DEBUG) # Ensure root logger level is set
+
+# Explicitly configure logging - trying another way
+log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=log_format, force=True)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Attempt imports within try-except block for debugging deployment issues
+try:
+    print("***** TOP LEVEL: Trying imports... *****") # ADDED FOR DEBUGGING
+    import firebase_admin
+    from firebase_admin import credentials, firestore
+    from . import config
+    from .kraken_api import get_kraken_kline_data
+    from .technical_analysis import analyze_technicals
+    from .position_manager import get_position, save_position, check_cooldown # Added save_position back
+    from .telegram_bot import send_telegram_message
+    from .confidence_calculator import get_confidence_score
+    print("***** TOP LEVEL: Imports successful *****") # ADDED FOR DEBUGGING
+    IMPORTS_SUCCESSFUL = True
+except ImportError as e:
+    print(f"***** TOP LEVEL IMPORT ERROR: {e} *****") # Use print for early logging potential
+    logger.error(f"Failed to import required modules at top level: {e}", exc_info=True) # Also log normally
+    # Let the function execution handle the failure
+except Exception as e:
+    print(f"***** TOP LEVEL UNEXPECTED ERROR DURING IMPORT: {e} *****")
+    logger.error(f"Unexpected error during top-level imports: {e}", exc_info=True)
+    # Let the function execution handle the failure
+
+# --- Firebase Initialization (Attempt at top level, checked in function) ---
+if IMPORTS_SUCCESSFUL and not firebase_admin._apps:
+    try:
+        # Use Application Default Credentials provided by the Cloud Functions environment
+        print("***** TOP LEVEL: Initializing Firebase Admin... *****")
+        firebase_admin.initialize_app()
+        db = firestore.client()
+        print("***** TOP LEVEL: Firebase Admin initialized successfully. *****") # Use print
+        logger.info("Firebase Admin initialized successfully at top level.")
+        FIREBASE_INITIALIZED = True
+    except Exception as e:
+        print(f"***** TOP LEVEL: Firebase Admin initialization failed: {e} *****") # Use print
+        logger.error(f"Firebase Admin initialization failed at top level: {e}", exc_info=True)
+        # Let the function execution handle the failure
+elif IMPORTS_SUCCESSFUL:
+    # Already initialized (e.g., in a warm instance)
+    db = firestore.client() # Ensure db is assigned
+    print("***** TOP LEVEL: Firebase Admin already initialized. *****")
+    logger.info("Firebase Admin already initialized at top level.")
+    FIREBASE_INITIALIZED = True # Assume it's good if apps exist
+
+import functions_framework
+import sys
+
+# Minimal logging setup just in case
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, force=True)
+logger = logging.getLogger(__name__)
+
+@functions_framework.http
 def run_signal_generation(request):
-    """
-    Cloud Function to generate trading signals.
-    This is triggered by HTTP request from Cloud Scheduler.
+    """Minimal function to test logging."""
+    message = "***** MINIMAL FUNCTION EXECUTING *****"
+    print(message) # Try basic print
+    logger.info(message) # Try logging
+    return "Minimal function executed.", 200
 
-    Args:
-        request: Flask request object
-    Returns:
-        HTTP response
-    """
-    # --- ALTERNATIVE LOGGING CONFIGURATION (Testing) ---
-    # Use basicConfig to set level AND ensure a handler is set up
-    # Force=True ensures it reconfigures even if already configured elsewhere (less likely here)
-    # Level=DEBUG to capture all logs
-    # logging.basicConfig(level=logging.DEBUG, force=True) # REMOVED AGAIN
-    # --- END LOGGING CONFIGURATION ---
-
-    # --- ADDED VERY EARLY LOG ---
-    # Let's see if the function even starts
-    # logger.info("--- Simplified function execution START ---") # Keep commented
-    
-    # Initialize logging for this run
-    logging.getLogger().setLevel(logging.DEBUG) # Re-enable setting level
-    logger.info("Starting signal generation process")
-
-    # Initialize Firebase HERE if not already initialized
-    # This needs to be done within the function scope for Cloud Functions
-    global db
-    if not firebase_admin._apps: # Check if already initialized (simpler check)
-        try:
-            # It's generally safe to call initialize_app multiple times,
-            # but checking first avoids potential warnings/overhead.
-            firebase_admin.initialize_app()
-            logger.info("Firebase Admin SDK initialized.")
-        except Exception as e:
-            logger.error(f"Error initializing Firebase Admin SDK: {e}", exc_info=True)
-            # Depending on severity, you might want to exit or handle differently
-            return ("Internal Server Error: Firebase initialization failed", 500)
-
-    # Get Firestore client - ensure initialization happened
-    try:
-        # db = firestore.client() # Original location
-        if db is None: # Initialize db if it's None
-            db = firestore.client()
-            logger.info("Firestore client obtained.")
-    except Exception as e:
-        logger.error(f"Error getting Firestore client: {e}", exc_info=True)
-        return ("Internal Server Error: Firestore client failed", 500)
-
-    logger.info(f"Processing coins: {config.COINS_TO_TRACK}")
-
-    # --- Main logic - Uncommented ---
-    try:
-        for coin in config.COINS_TO_TRACK:
-            logger.info(f"Processing coin: {coin}")
-            # Fetch data (replace with actual API call logic)
-            # kline_data = fetch_kline_data(coin, config.TIMEFRAME, limit=config.KLINE_LIMIT) # Replace with actual call
-            kline_data = fetch_kline_data(coin) # Using kraken_api version
-            if not kline_data:
-                 logger.warning(f"No kline data returned for {coin}")
-                 continue
-
-            # ---- ADDED DEBUG LOG ----
-            logger.debug(f"Passing {len(kline_data)} klines to process_crypto_data for {coin}")
-            # ---- END DEBUG LOG ----
-
-            # Process data and generate signals - Pass db
-            signal = process_crypto_data(coin, kline_data, db)
-
-            if signal:
-                logger.info(f"Generated signal for {coin}: {signal['type']}")
-                # Send notification (Implement telegram_bot.py)
-                send_telegram_message(signal) # Pass the signal dictionary
-                # Save/Update position in Firestore (Implement position_manager.py)
-                # Simplified logic - assumes save_position handles new/existing
-                # save_position(db, signal) # Removed, logic is within process_crypto_data
-            else:
-                logger.info(f"No signal generated for {coin}")
-
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during signal generation loop: {e}", exc_info=True)
-        # Decide if the entire function should fail or just log and continue
-        return ("Internal Server Error during processing", 500)
-    # --- End Main logic ---
-
-    # logger.info("--- Simplified function execution END ---") # Keep commented
-    logger.info("Signal generation process completed successfully.")
-    return ("Signal generation process completed successfully", 200)
-
-# === NEW TEST ENDPOINT === # REMOVED
-# def test_endpoint(request):
-#     """
-#     Minimal test endpoint to check basic function execution.
-#     """
-#     # Try basic logging
-#     try:
-#         # Get a logger specific to this test function
-#         # test_logger = logging.getLogger('test_endpoint') # Using print instead
-#         # Ensure logging is configured (using basicConfig for simplicity here)
-#         # logging.basicConfig(level=logging.INFO, force=True) # Using print instead
-#         # test_logger.info("--- test_endpoint START --- ")
-#         # test_logger.info("--- test_endpoint END --- ")
-#         print("--- test_endpoint START (using print) ---")
-#         print("--- test_endpoint END (using print) ---")
-#         return ("Test endpoint executed successfully!", 200)
-#     except Exception as e:
-#         # Fallback if logging itself fails
-#         print(f"Error in test_endpoint logging: {e}")
-#         return ("Error during test endpoint execution", 500)
-# === END TEST ENDPOINT === # REMOVED
+# # Local testing entry point (optional)
+# if __name__ == '__main__':
+#      # Mock request object for local testing if needed
+#      class MockRequest:
+#          args = {}
+#          def get_json(self, silent=False):
+#              return {}
+#
+#      # Set environment variables locally if not using ADC for local runs
+#      # os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'path/to/your/service-account-file.json'
+#      # os.environ['TELEGRAM_BOT_TOKEN'] = 'your_token'
+#      # os.environ['TELEGRAM_CHAT_ID'] = 'your_chat_id'
+#      # os.environ['GEMINI_API_KEY'] = 'your_gemini_key' # Needed if not hardcoding confidence
+#      # os.environ['CRYPTOCOMPARE_API_KEY'] = 'your_cryptocompare_key' # If needed by Kraken API wrapper or other parts
+#
+#      print("Running locally...")
+#      run_signal_generation(MockRequest())
