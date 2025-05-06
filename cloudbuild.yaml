@@ -12,8 +12,8 @@ steps:
     - --region=us-central1 # Deployment region (adjust if needed)
     - --project=telegram-signals-205cc # Explicitly specify project ID
     - --gen2               # Use Cloud Functions (2nd gen) backed by Cloud Run
-    - --memory=256M        # Memory allocation (adjust if needed)
-    - --cpu=1              # CPU allocation (scaled down, adjust if needed, 0.1666 minimum for some ops)
+    - --memory=512M        # Memory allocation (INCREASED FOR TEST)
+    - --cpu=1              # CPU allocation (explicitly 1 for test)
     - --timeout=300s       # Function execution timeout (adjust if needed, max 3600s for gen2 HTTP)
     - --min-instances=0    # Minimum instances (0 for cost savings)
     - --max-instances=2    # Maximum instances (adjust based on expected load)
