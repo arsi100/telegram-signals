@@ -22,7 +22,7 @@ try:
     from . import config
     from .kraken_api import fetch_kline_data
     from .technical_analysis import analyze_technicals
-    from .position_manager import get_position, save_position, check_cooldown
+    from .position_manager import get_open_position, save_position, is_in_cooldown_period
     from .telegram_bot import send_telegram_message
     from .confidence_calculator import get_confidence_score
     print("***** MAIN.PY TOP LEVEL: Application imports successful *****")
@@ -93,8 +93,8 @@ def run_signal_generation(request):
         all_results = []
         for coin_pair in config.COINS_TO_TRACK:
             logger.info(f"Processing coin: {coin_pair}")
-            current_position = get_position(db, coin_pair)
-            if check_cooldown(current_position):
+            current_position = get_open_position(coin_pair, db)
+            if is_in_cooldown_period(coin_pair, db, config.COOLDOWN_PERIOD_MINUTES):
                 logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
                 all_results.append(f"{coin_pair}: In cooldown.")
                 continue
