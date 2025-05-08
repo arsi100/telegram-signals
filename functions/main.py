@@ -91,7 +91,7 @@ def run_signal_generation(request):
                  return "Internal Server Error: Firebase client unavailable after re-attempt", 500
 
         all_results = []
-        for coin_pair in config.COINS_TO_TRACK:
+        for coin_pair in config.TRACKED_COINS:
             logger.info(f"Processing coin: {coin_pair}")
             current_position = get_open_position(coin_pair, db)
             if is_in_cooldown_period(coin_pair, db, config.COOLDOWN_PERIOD_MINUTES):
