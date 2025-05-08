@@ -94,7 +94,7 @@ def run_signal_generation(request):
         for coin_pair in config.TRACKED_COINS:
             logger.info(f"Processing coin: {coin_pair}")
             current_position = get_open_position(coin_pair, db)
-            if is_in_cooldown_period(coin_pair, db, config.COOLDOWN_PERIOD_MINUTES):
+            if is_in_cooldown_period(coin_pair, db, config.SIGNAL_COOLDOWN_MINUTES):
                 logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
                 all_results.append(f"{coin_pair}: In cooldown.")
                 continue
