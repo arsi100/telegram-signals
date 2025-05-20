@@ -1,16 +1,28 @@
 import os
 from dotenv import load_dotenv
+import logging
+
+# Setup logger for this module if needed for the info message
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file at the start
 # This makes them available via os.getenv throughout the application
 load_dotenv()
 
 # Firebase/Google Cloud configuration
-# GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT') # Old way
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
+# Use GOOGLE_CLOUD_PROJECT which is standard in GCP environments
+FIREBASE_PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT") 
+# If FIREBASE_PROJECT_ID is None here (e.g. local testing without this env var set),
+# firebase_admin.initialize_app() will try to auto-discover it. For explicit use:
+if FIREBASE_PROJECT_ID is None:
+    # Fallback for local or if GOOGLE_CLOUD_PROJECT isn't set for some reason
+    # You might want to set a default or raise an error if it's critical elsewhere
+    logger.info("GOOGLE_CLOUD_PROJECT not set, relying on Firebase Admin SDK auto-discovery or pre-set FIREBASE_PROJECT_ID env var.")
+    # Attempt to get it if specifically set via .env for local use as FIREBASE_PROJECT_ID
+    FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
+
 # GOOGLE_APPLICATION_CREDENTIALS is used directly by firebase_admin/google libs
 # We ensure it's loaded via load_dotenv() above.
-# GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") # No need to store in config var
 
 # Telegram Bot configuration
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
