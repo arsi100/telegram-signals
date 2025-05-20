@@ -22,15 +22,17 @@ CRYPTOCOMPARE_API_KEY = os.getenv('CRYPTOCOMPARE_API_KEY') # Keep loading this i
 
 # Trading parameters
 TRACKED_COINS = [
-    'PF_XBTUSD', # Example Kraken Symbol
+    'PF_XBTUSD', 
     'PF_ETHUSD',
-    # Add other Kraken perpetual symbols (check Markets endpoint)
-    # 'SOLUSDT', # Bybit format
-    # 'BNBUSDT',
-    # 'DOGEUSDT',
-    # 'XRPUSDT',
-    # 'ADAUSDT',
-    # 'AVAXUSDT'
+    'PF_XRPUSD',
+    'PF_SOLUSD',
+    'PF_ADAUSD',
+    'PF_DOGEUSD',
+    'PF_BNBUSD',  # Verify availability on Kraken Futures
+    'PF_PEPEUSD', # Verify availability on Kraken Futures
+    'PF_TRXUSD',
+    'PF_LINKUSD',
+    'PF_LTCUSD'
 ]
 
 # Market hours configuration (UTC)
@@ -53,3 +55,7 @@ LOG_LEVEL = "INFO" # Default logging level (e.g., DEBUG, INFO, WARNING, ERROR)
 
 # Signal Generation Parameters
 CONFIDENCE_THRESHOLD = 80 # Minimum confidence score (0-100) to generate a signal
+
+# New additions
+KLINE_INTERVAL = "15m"  # Default interval for kline data
+KLINE_LIMIT = 100         # Default limit for kline data

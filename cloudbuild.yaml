@@ -6,19 +6,19 @@ steps:
     - deploy
     - run_signal_generation  # Your function name
     - --source=./functions  # Directory containing your function code relative to root
-    - --entry-point=run_signal_generation # Python function to execute (REVERTED)
-    - --runtime=python310  # TRYING PYTHON 3.10
+    - --entry-point=run_signal_generation # Python function to execute
+    - --runtime=python311  # Updated to Python 3.11
     - --trigger-http       # Trigger via HTTP (for Cloud Scheduler)
     - --region=us-central1 # Deployment region (adjust if needed)
     - --project=telegram-signals-205cc # Explicitly specify project ID
     - --gen2               # Use Cloud Functions (2nd gen) backed by Cloud Run
-    - --memory=512M        # Memory allocation (KEEPING INCREASED FOR TEST)
-    - --cpu=1              # CPU allocation (explicitly 1 for test)
-    - --timeout=300s       # Function execution timeout (adjust if needed, max 3600s for gen2 HTTP)
-    - --min-instances=0    # Minimum instances (0 for cost savings)
-    - --max-instances=2    # Maximum instances (adjust based on expected load)
-    # NOTE: secrets are now passed via the trigger configuration, not here.
-    # - --set-secrets=/secrets/GEMINI_API_KEY=GEMINI_API_KEY:latest,/secrets/TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,/secrets/TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,/secrets/CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest
+    - --memory=512M        # Memory allocation
+    - --cpu=1              # CPU allocation
+    - --timeout=300s       # Function execution timeout
+    - --min-instances=0    # Minimum instances
+    - --max-instances=2    # Maximum instances
+    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest,FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest # Secrets to be available as environment variables
+    - --allow-unauthenticated
 
 # availableSecrets:
 #   secretManager:
@@ -30,6 +30,8 @@ steps:
 #     env: 'TELEGRAM_CHAT_ID'
 #   - versionName: projects/$PROJECT_ID/secrets/CRYPTOCOMPARE_API_KEY/versions/latest
 #     env: 'CRYPTOCOMPARE_API_KEY'
+#   - versionName: projects/$PROJECT_ID/secrets/FIREBASE_PROJECT_ID/versions/latest
+#     env: 'FIREBASE_PROJECT_ID'
 
 options:
   logging: CLOUD_LOGGING_ONLY # Use Cloud Logging for build logs
@@ -40,8 +42,5 @@ options:
 # Optional: Specify the service account Cloud Build uses (uses default if omitted)
 # serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...'
 # Triggering build after Org Policy update.
-
-# Allow unauthenticated access (adjust if needed, e.g., for internal services)
-#    - --allow-unauthenticated # REMOVED - Use OIDC service account for Scheduler
 
 # Trigger rebuild comment
