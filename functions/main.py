@@ -18,37 +18,56 @@ db = None
 
 # Import and initialize Firebase at the top level
 try:
-    print("***** MAIN.PY TOP LEVEL: Attempting imports... *****")
+    print("***** MAIN.PY TOP LEVEL: START OF TRY BLOCK *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'import firebase_admin'... *****")
     import firebase_admin
+    print("***** MAIN.PY TOP LEVEL: 'import firebase_admin' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from firebase_admin import credentials, firestore'... *****")
     from firebase_admin import credentials, firestore
+    print("***** MAIN.PY TOP LEVEL: 'from firebase_admin import credentials, firestore' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from . import config'... *****")
     from . import config
+    print("***** MAIN.PY TOP LEVEL: 'from . import config' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from .kraken_api import fetch_kline_data'... *****")
     from .kraken_api import fetch_kline_data
+    print("***** MAIN.PY TOP LEVEL: 'from .kraken_api import fetch_kline_data' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from .technical_analysis import analyze_technicals'... *****")
     from .technical_analysis import analyze_technicals
+    print("***** MAIN.PY TOP LEVEL: 'from .technical_analysis import analyze_technicals' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from .position_manager import ...'... *****")
     from .position_manager import get_open_position, save_position, is_in_cooldown_period
+    print("***** MAIN.PY TOP LEVEL: 'from .position_manager import ...' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from .telegram_bot import send_telegram_message'... *****")
     from .telegram_bot import send_telegram_message
+    print("***** MAIN.PY TOP LEVEL: 'from .telegram_bot import send_telegram_message' - SUCCESS *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from .confidence_calculator import get_confidence_score'... *****")
     from .confidence_calculator import get_confidence_score
+    print("***** MAIN.PY TOP LEVEL: 'from .confidence_calculator import get_confidence_score' - SUCCESS *****")
     print("***** MAIN.PY TOP LEVEL: Application imports successful *****")
     IMPORTS_SUCCESSFUL = True
 
     if not firebase_admin._apps:
-        print("***** MAIN.PY TOP LEVEL: Initializing Firebase Admin... *****")
+        print("***** MAIN.PY TOP LEVEL: Firebase not initialized. Attempting firebase_admin.initialize_app()... *****")
         firebase_admin.initialize_app() # Use Application Default Credentials
         db = firestore.client()
-        print("***** MAIN.PY TOP LEVEL: Firebase Admin initialized. *****")
+        print("***** MAIN.PY TOP LEVEL: firebase_admin.initialize_app() - SUCCESS. DB client obtained. *****")
         FIREBASE_INITIALIZED = True
     else:
+        print("***** MAIN.PY TOP LEVEL: Firebase already initialized. Attempting firestore.client()... *****")
         db = firestore.client()
-        print("***** MAIN.PY TOP LEVEL: Firebase Admin already initialized. *****")
+        print("***** MAIN.PY TOP LEVEL: firestore.client() - SUCCESS. DB client obtained. *****")
         FIREBASE_INITIALIZED = True
 
 except ImportError as e:
-    print(f"***** MAIN.PY TOP LEVEL IMPORT ERROR: {e} *****")
+    print(f"***** MAIN.PY TOP LEVEL IMPORT ERROR: Module -> {e.name}, Message -> {e.msg} *****")
     logger.error(f"Failed to import required modules at top level: {e}", exc_info=True)
     # IMPORTS_SUCCESSFUL remains False
 except Exception as e:
-    print(f"***** MAIN.PY TOP LEVEL UNEXPECTED ERROR (likely during Firebase init): {e} *****")
+    print(f"***** MAIN.PY TOP LEVEL UNEXPECTED ERROR (likely during Firebase init or other): {type(e).__name__} - {e} *****")
     logger.error(f"Unexpected error during top-level imports or Firebase init: {e}", exc_info=True)
     # IMPORTS_SUCCESSFUL and FIREBASE_INITIALIZED might be False
+finally:
+    print(f"***** MAIN.PY TOP LEVEL: END OF TRY-EXCEPT-FINALLY. IMPORTS_SUCCESSFUL: {IMPORTS_SUCCESSFUL}, FIREBASE_INITIALIZED: {FIREBASE_INITIALIZED} *****")
 
 
 @functions_framework.http
