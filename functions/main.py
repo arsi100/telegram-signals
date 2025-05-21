@@ -1,3 +1,5 @@
+# main.py
+# Last modified: 2025-05-21 - Force rebuild
 import functions_framework
 import logging
 import os
@@ -98,14 +100,14 @@ def run_signal_generation(request):
                 logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
                 all_results.append(f"{coin_pair}: In cooldown.")
                 continue
-
-            kline_data = fetch_kline_data(coin_pair, interval=config.KLINE_INTERVAL, limit=config.KLINE_LIMIT)
-            if kline_data is None or kline_data.empty:
+                
+            kline_data = fetch_kline_data(coin_pair)
+            if kline_data is None or not kline_data:
                 logger.warning(f"Could not fetch kline data for {coin_pair}.")
                 all_results.append(f"{coin_pair}: No kline data.")
                 continue
 
-            required_points = max(config.SMA_PERIOD_LONG, config.RSI_PERIOD) + 5
+            required_points = max(config.SMA_PERIOD, config.RSI_PERIOD) + 5
             if len(kline_data) < required_points:
                 logger.warning(f"Not enough data points ({len(kline_data)} < {required_points}) for {coin_pair}.")
                 all_results.append(f"{coin_pair}: Not enough data ({len(kline_data)} points).")
@@ -141,14 +143,14 @@ def run_signal_generation(request):
                     f"Price: {technicals.get('current_price', 'N/A')}"
                 )
                 send_telegram_message(message)
-                all_results.append(f"{coin_pair}: {signal.toUpperCase()} signal generated and notified.") # Corrected to signal.upper()
+                all_results.append(f"{coin_pair}: {signal.upper()} signal generated and notified.")
             else:
                 logger.info(f"No signal generated for {coin_pair}.")
                 all_results.append(f"{coin_pair}: No signal.")
 
         logger.info("Signal generation cycle finished.")
         return f"Signal generation finished. Results: {'; '.join(all_results)}", 200
-
+    
     except Exception as e:
         final_error_message = f"***** CRITICAL ERROR in run_signal_generation: {e} *****"
         print(final_error_message)
