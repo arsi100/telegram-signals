@@ -112,43 +112,64 @@ def run_signal_generation(request):
                  return "Internal Server Error: Firebase client unavailable after re-attempt", 500
 
         all_results = []
+        forced_signal_for_first_coin = False # Flag to ensure we only force one signal
+
         for coin_pair in config.TRACKED_COINS:
             logger.info(f"Processing coin: {coin_pair}")
             current_position = get_open_position(coin_pair, db)
-            if is_in_cooldown_period(coin_pair, db, config.SIGNAL_COOLDOWN_MINUTES):
-                logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
-                all_results.append(f"{coin_pair}: In cooldown.")
-                continue
-                
-            kline_data = fetch_kline_data(coin_pair)
-            if kline_data is None or not kline_data:
-                logger.warning(f"Could not fetch kline data for {coin_pair}.")
-                all_results.append(f"{coin_pair}: No kline data.")
-                continue
-
-            required_points = max(config.SMA_PERIOD, config.RSI_PERIOD) + 5
-            if len(kline_data) < required_points:
-                logger.warning(f"Not enough data points ({len(kline_data)} < {required_points}) for {coin_pair}.")
-                all_results.append(f"{coin_pair}: Not enough data ({len(kline_data)} points).")
-                continue
-
-            technicals = analyze_technicals(kline_data)
-            if technicals is None:
-                logger.warning(f"Technical analysis failed for {coin_pair}.")
-                all_results.append(f"{coin_pair}: TA failed.")
-                continue
-
-            confidence_score = 8 # Hardcoded for now
-            logger.info(f"Confidence score for {coin_pair}: {confidence_score} (Using hardcoded value)")
-
+            
+            # --- TEMPORARY MODIFICATION TO FORCE SIGNAL ---
             signal = None
-            if technicals.get('pattern_detected') and confidence_score >= config.CONFIDENCE_THRESHOLD:
-                if technicals['pattern_bullish'] and technicals['rsi'] < config.RSI_OVERSOLD and technicals['volume_increase'] and technicals['sma_cross_bullish']:
-                    if current_position is None or current_position.get('status') == 'closed':
-                        signal = 'buy'
-                elif technicals['pattern_bearish'] and technicals['rsi'] > config.RSI_OVERBOUGHT and technicals['volume_increase'] and technicals['sma_cross_bearish']:
-                    if current_position and current_position.get('status') == 'open':
-                        signal = 'sell'
+            if not forced_signal_for_first_coin:
+                logger.info(f"TEMP: Forcing BUY signal for {coin_pair} to test Telegram.")
+                signal = 'buy'
+                # Ensure technicals object exists and has some dummy data for the message
+                technicals_for_forced_signal = {
+                    'pattern_detected': True, 'pattern_bullish': True, 'pattern_bearish': False,
+                    'rsi': 30, 'volume_increase': True, 'sma_cross_bullish': True, 'sma_cross_bearish': False,
+                    'pattern_name': 'Forced Test Signal', 'current_price': 12345.67
+                }
+                # Use these dummy technicals if we forced a signal
+                # Original technical analysis is skipped for this forced signal
+                if signal: # If we are in the forced signal block
+                    technicals = technicals_for_forced_signal 
+                forced_signal_for_first_coin = True
+            # --- END OF TEMPORARY MODIFICATION ---
+            else: # Original logic for subsequent coins OR if not forcing
+                if is_in_cooldown_period(coin_pair, db, config.SIGNAL_COOLDOWN_MINUTES):
+                    logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
+                    all_results.append(f"{coin_pair}: In cooldown.")
+                    continue
+                    
+                kline_data = fetch_kline_data(coin_pair)
+                if kline_data is None or not kline_data:
+                    logger.warning(f"Could not fetch kline data for {coin_pair}.")
+                    all_results.append(f"{coin_pair}: No kline data.")
+                    continue
+
+                required_points = max(config.SMA_PERIOD, config.RSI_PERIOD) + 5
+                if len(kline_data) < required_points:
+                    logger.warning(f"Not enough data points ({len(kline_data)} < {required_points}) for {coin_pair}.")
+                    all_results.append(f"{coin_pair}: Not enough data ({len(kline_data)} points).")
+                    continue
+
+                technicals = analyze_technicals(kline_data)
+                if technicals is None:
+                    logger.warning(f"Technical analysis failed for {coin_pair}.")
+                    all_results.append(f"{coin_pair}: TA failed.")
+                    continue
+
+                confidence_score = 8 # Hardcoded for now
+                logger.info(f"Confidence score for {coin_pair}: {confidence_score} (Using hardcoded value)")
+
+                # Original signal decision logic (only if not forced)
+                if technicals.get('pattern_detected') and confidence_score >= config.CONFIDENCE_THRESHOLD:
+                    if technicals['pattern_bullish'] and technicals['rsi'] < config.RSI_OVERSOLD and technicals['volume_increase'] and technicals['sma_cross_bullish']:
+                        if current_position is None or current_position.get('status') == 'closed':
+                            signal = 'buy'
+                    elif technicals['pattern_bearish'] and technicals['rsi'] > config.RSI_OVERBOUGHT and technicals['volume_increase'] and technicals['sma_cross_bearish']:
+                        if current_position and current_position.get('status') == 'open':
+                            signal = 'sell'
             
             if signal:
                 logger.info(f"{signal.upper()} signal generated for {coin_pair}")
