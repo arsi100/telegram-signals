@@ -1,4 +1,5 @@
 # main.py
+# Last modified: 2025-05-21 - Force rebuild for Telegram secret refresh
 # Last modified: 2025-05-21 - Force rebuild
 import functions_framework
 import logging
