@@ -130,6 +130,7 @@ def run_signal_generation(request):
                     'rsi': 30, 'volume_increase': True, 'sma_cross_bullish': True, 'sma_cross_bearish': False,
                     'pattern_name': 'Forced Test Signal', 'current_price': 12345.67
                 }
+                confidence_score = 1.0 # Assign dummy confidence for the forced signal
                 # Use these dummy technicals if we forced a signal
                 # Original technical analysis is skipped for this forced signal
                 if signal: # If we are in the forced signal block
