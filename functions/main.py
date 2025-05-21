@@ -175,17 +175,37 @@ def run_signal_generation(request):
             
             if signal:
                 logger.info(f"{signal.upper()} signal generated for {coin_pair}")
-                save_position(db, coin_pair, signal, technicals, confidence_score, current_position)
-                message = (
-                    f"*{signal.upper()} Signal for {coin_pair}*\n\n"
-                    f"Pattern: {technicals.get('pattern_name', 'N/A')} ({'Bullish' if technicals.get('pattern_bullish') else 'Bearish' if technicals.get('pattern_bearish') else 'Neutral'})\n"
-                    f"RSI: {technicals.get('rsi', 'N/A'):.2f}\n"
-                    f"Volume Incr: {technicals.get('volume_increase', 'N/A')}\n"
-                    f"SMA Cross: {'Bullish' if technicals.get('sma_cross_bullish') else 'Bearish' if technicals.get('sma_cross_bearish') else 'None'}\n"
-                    f"Price: {technicals.get('current_price', 'N/A')}"
-                )
-                send_telegram_message(message)
-                all_results.append(f"{coin_pair}: {signal.upper()} signal generated and notified.")
+                
+                # Prepare the data for save_position
+                signal_data_for_firestore = {
+                    "symbol": coin_pair,
+                    "type": signal.upper(),  # 'buy' becomes 'BUY', 'sell' becomes 'SELL'
+                    "price": technicals.get('current_price'), # From technical_analysis or forced_signal
+                    "confidence": confidence_score,
+                    # Optional: Add more details from technicals if save_position uses them
+                    "rsi": technicals.get('rsi'),
+                    "pattern_name": technicals.get('pattern_name'),
+                    "volume_increase": technicals.get('volume_increase'),
+                    "sma_cross_bullish": technicals.get('sma_cross_bullish', False), # Default to False if not present
+                    "sma_cross_bearish": technicals.get('sma_cross_bearish', False)  # Default to False if not present
+                }
+
+                # Corrected call to save_position
+                position_ref = save_position(signal_data_for_firestore, db)
+                
+                if position_ref:
+                    message = (
+                        f"*{signal.upper()} Signal for {coin_pair}*\n\n"
+                        f"Pattern: {technicals.get('pattern_name', 'N/A')} ({'Bullish' if technicals.get('pattern_bullish') else 'Bearish' if technicals.get('pattern_bearish') else 'Neutral'})\n"
+                        f"RSI: {technicals.get('rsi', 'N/A'):.2f}\n"
+                        f"Volume Incr: {technicals.get('volume_increase', 'N/A')}\n"
+                        f"SMA Cross: {'Bullish' if technicals.get('sma_cross_bullish') else 'Bearish' if technicals.get('sma_cross_bearish') else 'None'}\n"
+                        f"Price: {technicals.get('current_price', 'N/A')}"
+                    )
+                    send_telegram_message(message)
+                    all_results.append(f"{coin_pair}: {signal.upper()} signal generated and notified.")
+                else:
+                    all_results.append(f"{coin_pair}: {signal.upper()} signal generated but FAILED to save position.")
             else:
                 logger.info(f"No signal generated for {coin_pair}.")
                 all_results.append(f"{coin_pair}: No signal.")
