@@ -48,14 +48,17 @@ try:
     from .technical_analysis import analyze_technicals
     print("***** MAIN.PY TOP LEVEL: 'from .technical_analysis import analyze_technicals' - SUCCESS *****")
     print("***** MAIN.PY TOP LEVEL: Attempting 'from .position_manager import ...'... *****")
-    from .position_manager import get_open_position, save_position, is_in_cooldown_period
+    from .position_manager import get_open_position, save_position, update_position, close_position, record_signal_ts
     print("***** MAIN.PY TOP LEVEL: 'from .position_manager import ...' - SUCCESS *****")
     print("***** MAIN.PY TOP LEVEL: Attempting 'from .telegram_bot import send_telegram_message'... *****")
     from .telegram_bot import send_telegram_message
     print("***** MAIN.PY TOP LEVEL: 'from .telegram_bot import send_telegram_message' - SUCCESS *****")
     print("***** MAIN.PY TOP LEVEL: Attempting 'from .confidence_calculator import get_confidence_score'... *****")
-    from .confidence_calculator import get_confidence_score
-    print("***** MAIN.PY TOP LEVEL: 'from .confidence_calculator import get_confidence_score' - SUCCESS *****")
+    # from .confidence_calculator import get_confidence_score # This will be called by signal_generator
+    print("***** MAIN.PY TOP LEVEL: 'from .confidence_calculator import get_confidence_score' - COMMENTED OUT / HANDLED BY SIGNAL_GENERATOR *****")
+    print("***** MAIN.PY TOP LEVEL: Attempting 'from .signal_generator import process_crypto_data'... *****")
+    from .signal_generator import process_crypto_data
+    print("***** MAIN.PY TOP LEVEL: 'from .signal_generator import process_crypto_data' - SUCCESS *****")
     print("***** MAIN.PY TOP LEVEL: Application imports successful *****")
     IMPORTS_SUCCESSFUL = True
 
@@ -131,10 +134,11 @@ def run_signal_generation(request):
             current_position = get_open_position(coin_pair, db)
             
             signal = None # Initialize signal for normal processing
-            if is_in_cooldown_period(coin_pair, db, config.SIGNAL_COOLDOWN_MINUTES):
-                logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
-                all_results.append(f"{coin_pair}: In cooldown.")
-                continue
+            # Cooldown check is now inside process_crypto_data, but we might want to record successful signal timestamps here
+            # if is_in_cooldown_period(coin_pair, db, config.SIGNAL_COOLDOWN_MINUTES):
+            #     logger.info(f"Coin {coin_pair} is in cooldown. Skipping.")
+            #     all_results.append(f"{coin_pair}: In cooldown.")
+            #     continue
                 
             kline_data = fetch_kline_data(coin_pair)
             if kline_data is None or not kline_data:
@@ -154,46 +158,55 @@ def run_signal_generation(request):
                 all_results.append(f"{coin_pair}: TA failed.")
                 continue
 
-            confidence_score = 8 # Hardcoded for now
-            logger.info(f"Confidence score for {coin_pair}: {confidence_score} (Using hardcoded value)")
+            # --- Call signal_generator.process_crypto_data ---
+            # This function now handles cooldown checks, TA, confidence, and all signal logic (ENTRY, EXIT, AVG_UP/DOWN)
+            generated_signal_details = process_crypto_data(coin_pair, kline_data, db)
 
-            # Original signal decision logic (only if not forced)
-            if technicals.get('pattern_detected') and confidence_score >= config.CONFIDENCE_THRESHOLD:
-                if technicals['pattern_bullish'] and technicals['rsi'] < config.RSI_OVERSOLD and technicals['volume_increase'] and technicals['sma_cross_bullish']:
-                    if current_position is None or current_position.get('status') == 'closed':
-                        signal = 'buy'
-                elif technicals['pattern_bearish'] and technicals['rsi'] > config.RSI_OVERBOUGHT and technicals['volume_increase'] and technicals['sma_cross_bearish']:
-                    if current_position and current_position.get('status') == 'open':
-                        signal = 'sell'
-            
-            if signal:
-                logger.info(f"{signal.upper()} signal generated for {coin_pair}")
-                
-                # Prepare the data for save_position
-                signal_data_for_firestore = {
-                    "symbol": coin_pair,
-                    "type": signal.upper(),  # 'buy' becomes 'BUY', 'sell' becomes 'SELL'
-                    "price": technicals.get('current_price'), # From technical_analysis or forced_signal
-                    "confidence": confidence_score,
-                    # Optional: Add more details from technicals if save_position uses them
-                    "rsi": technicals.get('rsi'),
-                    "pattern_name": technicals.get('pattern_name'),
-                    "volume_increase": technicals.get('volume_increase'),
-                    "sma_cross_bullish": technicals.get('sma_cross_bullish', False), # Default to False if not present
-                    "sma_cross_bearish": technicals.get('sma_cross_bearish', False)  # Default to False if not present
-                }
+            if generated_signal_details and isinstance(generated_signal_details, dict):
+                signal_type = generated_signal_details.get("type")
+                signal_price = generated_signal_details.get("price")
+                log_message = f"{coin_pair}: {signal_type} signal generated at {signal_price}. Confidence: {generated_signal_details.get('confidence')}."
+                logger.info(log_message)
 
-                # Corrected call to save_position
-                position_ref = save_position(signal_data_for_firestore, db)
+                action_taken = False
+                if signal_type in ["LONG", "SHORT"]: # New entry signals
+                    position_ref = save_position(generated_signal_details, db)
+                    if position_ref:
+                        send_telegram_message(generated_signal_details)
+                        record_signal_ts(coin_pair, db) # Record timestamp for new LONG/SHORT
+                        all_results.append(f"{log_message} Saved and Notified.")
+                        action_taken = True
+                    else:
+                        all_results.append(f"{log_message} FAILED to save position.")
                 
-                if position_ref:
-                    send_telegram_message(signal_data_for_firestore)
-                    all_results.append(f"{coin_pair}: {signal.upper()} signal generated and notified.")
-                else:
-                    all_results.append(f"{coin_pair}: {signal.upper()} signal generated but FAILED to save position.")
-            else:
-                logger.info(f"No signal generated for {coin_pair}.")
-                all_results.append(f"{coin_pair}: No signal.")
+                elif signal_type == "EXIT":
+                    position_ref_path = generated_signal_details.get("position_ref")
+                    if position_ref_path and close_position(position_ref_path, signal_price, db):
+                        send_telegram_message(generated_signal_details)
+                        # record_signal_ts(coin_pair, db) # Do not record cooldown for EXIT
+                        all_results.append(f"{log_message} Position Closed and Notified.")
+                        action_taken = True
+                    else:
+                        all_results.append(f"{log_message} FAILED to close position or missing ref_path.")
+
+                elif signal_type and (signal_type.startswith("AVG_DOWN") or signal_type.startswith("AVG_UP")) :
+                    position_ref_path = generated_signal_details.get("position_ref")
+                    if position_ref_path and update_position(position_ref_path, generated_signal_details, db):
+                        send_telegram_message(generated_signal_details)
+                        # record_signal_ts(coin_pair, db) # Do not record cooldown for AVG signals
+                        all_results.append(f"{log_message} Position Updated and Notified.")
+                        action_taken = True
+                    else:
+                        all_results.append(f"{log_message} FAILED to update position or missing ref_path.")
+                
+                if not action_taken and signal_type: # If a signal type was returned but not handled above
+                     all_results.append(f"{log_message} Signal type {signal_type} not processed for action.")
+                elif not signal_type: # if generated_signal_details was returned, but no type (should not happen)
+                     all_results.append(f"{coin_pair}: process_crypto_data returned details but no signal type.")
+
+            else: # No signal generated by process_crypto_data
+                logger.info(f"No signal generated for {coin_pair} by process_crypto_data.")
+                all_results.append(f"{coin_pair}: No signal from process_crypto_data.")
 
         logger.info("Signal generation cycle finished.")
         return f"Signal generation finished. Results: {'; '.join(all_results)}", 200
