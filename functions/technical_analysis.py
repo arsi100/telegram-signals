@@ -173,7 +173,7 @@ def analyze_volume(df: pd.DataFrame, return_all=False):
                     else: latest_results[key] = default_result_latest[key]
                 else: latest_results[key] = default_result_latest[key]
             return latest_results
-
+        
     except Exception as e:
         logger.error(f"Error analyzing volume: {e}", exc_info=True)
         return default_result_all if return_all else default_result_latest
@@ -423,7 +423,7 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
                                 break # Found a raw pattern for the latest candle
 
             return latest_confirmed_signal
-
+        
     except Exception as e:
         logger.error(f"Error detecting candlestick patterns: {e}", exc_info=True)
         if return_all:
@@ -477,7 +477,7 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
         technicals = {
             'rsi': rsi_latest,
             'sma': sma_latest, 
-            'current_price': current_price,
+            'latest_close': current_price,
             'volume_increase': volume_analysis_latest.get('high_volume', False),
             'pattern_detected': pattern_result.get("pattern_detected_raw", False), 
             'pattern_bullish': pattern_result.get("pattern_type") == "bullish",
