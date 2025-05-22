@@ -7,6 +7,10 @@ import os
 import sys
 from telegram import Bot
 
+# Suppress pandas warnings to reduce log noise
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 # --- Add httpx logging configuration ---
 logging.getLogger("httpx").setLevel(logging.DEBUG)
 logging.getLogger("httpcore").setLevel(logging.DEBUG)
