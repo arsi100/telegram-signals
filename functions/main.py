@@ -54,7 +54,7 @@ try:
     from .telegram_bot import send_telegram_message
     print("***** MAIN.PY TOP LEVEL: 'from .telegram_bot import send_telegram_message' - SUCCESS *****")
     print("***** MAIN.PY TOP LEVEL: Attempting 'from .confidence_calculator import get_confidence_score'... *****")
-    # from .confidence_calculator import get_confidence_score # This will be called by signal_generator
+    from .confidence_calculator import get_confidence_score
     print("***** MAIN.PY TOP LEVEL: 'from .confidence_calculator import get_confidence_score' - COMMENTED OUT / HANDLED BY SIGNAL_GENERATOR *****")
     print("***** MAIN.PY TOP LEVEL: Attempting 'from .signal_generator import process_crypto_data'... *****")
     from .signal_generator import process_crypto_data
@@ -161,6 +161,7 @@ def run_signal_generation(request):
             # --- Call signal_generator.process_crypto_data ---
             # This function now handles cooldown checks, TA, confidence, and all signal logic (ENTRY, EXIT, AVG_UP/DOWN)
             generated_signal_details = process_crypto_data(coin_pair, kline_data, db)
+            logger.info(f"[DEBUG MAIN] For {coin_pair}, process_crypto_data returned: {generated_signal_details}")
 
             if generated_signal_details and isinstance(generated_signal_details, dict):
                 signal_type = generated_signal_details.get("type")
@@ -189,7 +190,7 @@ def run_signal_generation(request):
                     else:
                         all_results.append(f"{log_message} FAILED to close position or missing ref_path.")
 
-                elif signal_type and (signal_type.startswith("AVG_DOWN") or signal_type.startswith("AVG_UP")) :
+                elif signal_type and (signal_type.startswith("AVG_DOWN") or signal_type.startswith("AVG_UP")):
                     position_ref_path = generated_signal_details.get("position_ref")
                     if position_ref_path and update_position(position_ref_path, generated_signal_details, db):
                         send_telegram_message(generated_signal_details)
