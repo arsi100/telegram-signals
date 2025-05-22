@@ -95,11 +95,10 @@ def process_crypto_data(symbol, kline_data, db):
             
         # Extract key results
         price = tech_results['latest_close']
-        patterns = tech_results['patterns']
+        patterns = tech_results['raw_patterns_result']
         rsi = tech_results['rsi']
         sma = tech_results['sma']
-        volume_info = tech_results['volume']
-        is_high_volume = volume_info['high_volume']
+        is_high_volume = tech_results['volume_increase']
 
         logger.info(f"{symbol} TA Results - Price: {price:.2f}, RSI: {rsi:.2f}, SMA: {sma:.2f}, HighVol: {is_high_volume}, Patterns: {patterns}")
 
@@ -249,8 +248,8 @@ def process_crypto_data(symbol, kline_data, db):
                           # Include context for notification/saving?
                           "rsi": rsi,
                           "sma": sma,
-                          "volume_ratio": volume_info.get('volume_ratio', 1.0)
-                          # TODO: Add long-term trend from external AI?
+                          "volume_ratio": tech_results['raw_volume_analysis'].get('volume_ratio', 1.0) # Correctly access volume_ratio
+                            # TODO: Add long-term trend from external AI?
                      }
                 else:
                     logger.info(f"{symbol} {final_signal_type} signal final confidence {final_confidence:.2f} below threshold {config.CONFIDENCE_THRESHOLD}.")
