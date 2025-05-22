@@ -137,6 +137,7 @@ requests==2.31.0
 urllib3==2.4.0
     # via requests
 pandas-ta
+python-telegram-bot==20.3
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

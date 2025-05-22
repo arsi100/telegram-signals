@@ -13,7 +13,7 @@ def _format_signal_message(signal: dict) -> str:
     Formats a signal dictionary into a Telegram message string.
     NOTE: Does NOT escape markdown characters.
     """
-    signal_type = signal.get("type", "UNKNOWN").upper()
+    signal_type_raw = signal.get("type", "UNKNOWN").upper()
     symbol = signal.get("symbol", "N/A")
     price = signal.get("price", 0.0)
     confidence = signal.get("confidence", 0.0)
@@ -21,10 +21,18 @@ def _format_signal_message(signal: dict) -> str:
     pnl_percent = signal.get("pnl_percent", None) # Placeholder - TODO: Calculate in exit logic
     trailing_stop = signal.get("trailing_stop", None) # Placeholder - TODO: Calculate in avg up logic
     
-    message = f"ℹ️ Unknown Signal: {signal_type} for {symbol} at ${price:,.2f}"
+    # Map BUY/SELL to LONG/SHORT for formatting consistency
+    if signal_type_raw == "BUY":
+        signal_type_for_format = "LONG"
+    elif signal_type_raw == "SELL":
+        signal_type_for_format = "SHORT"
+    else:
+        signal_type_for_format = signal_type_raw # EXIT, AVG_DOWN etc. or UNKNOWN
+
+    message = f"ℹ️ Unknown Signal: {signal_type_raw} for {symbol} at ${price:,.2f}" # Default message if not LONG/SHORT/EXIT etc.
 
     # --- Format based on Signal Type --- 
-    if signal_type == "LONG":
+    if signal_type_for_format == "LONG":
         stop_loss = price * (1 - 0.02) # 2% SL
         message = (
             f"📈 LONG {symbol} at ${price:,.2f}, "
@@ -32,7 +40,7 @@ def _format_signal_message(signal: dict) -> str:
             f"Stop Loss: ${stop_loss:,.2f} (10x leverage), "
             f"Long-term: {long_term_trend}"
         )
-    elif signal_type == "SHORT":
+    elif signal_type_for_format == "SHORT":
         stop_loss = price * (1 + 0.02) # 2% SL
         message = (
             f"📉 SHORT {symbol} at ${price:,.2f}, "
@@ -40,21 +48,26 @@ def _format_signal_message(signal: dict) -> str:
             f"Stop Loss: ${stop_loss:,.2f} (10x leverage), "
             f"Long-term: {long_term_trend}"
         )
-    elif signal_type == "EXIT":
+    elif signal_type_raw == "EXIT":
         # TODO: Determine original position type (LONG/SHORT) for message
         original_type = "" # e.g., " LONG" or " SHORT"
         pnl_str = f", Profit: {pnl_percent:.2f}%" if pnl_percent is not None else ""
         message = (
             f"🚪 EXIT{original_type} {symbol} at ${price:,.2f}{pnl_str}"
         )
-    elif signal_type.startswith("AVG_DOWN"):
-        position_type = "LONG" if "LONG" in signal_type else "SHORT"
+    elif signal_type_raw.startswith("AVG_DOWN"):
+        # position_type = "LONG" if "LONG" in signal_type_raw else "SHORT" # This logic was a bit flawed
+        # Determine if original position was LONG or SHORT based on future DB structure
+        # For now, let's assume if it's AVG_DOWN it's for a LONG position
+        position_type = "LONG" 
         message = (
             f"⏬ AVERAGE DOWN {position_type} {symbol} at ${price:,.2f}, "
             f"Confidence: {confidence:.0f}%"
         )
-    elif signal_type.startswith("AVG_UP"):
-        position_type = "LONG" if "LONG" in signal_type else "SHORT"
+    elif signal_type_raw.startswith("AVG_UP"):
+        # position_type = "LONG" if "LONG" in signal_type_raw else "SHORT"
+        # For now, let's assume if it's AVG_UP it's for a LONG position
+        position_type = "LONG" 
         # TODO: Calculate Trailing Stop value properly
         ts_str = f", Trailing Stop: ${trailing_stop:,.2f}" if trailing_stop is not None else ""
         message = (
@@ -76,7 +89,7 @@ def send_telegram_message(signal: dict, parse_mode="MarkdownV2"):
     if not token or not chat_id:
         logger.warning("Telegram bot token or chat ID not found. Cannot send message.")
         return False
-        
+    
     if not signal or not isinstance(signal, dict):
          logger.error("send_telegram_message received invalid signal object.")
          return False
@@ -112,9 +125,9 @@ def send_telegram_message(signal: dict, parse_mode="MarkdownV2"):
         # Only include parse_mode if it's set (e.g., not None after escaping error)
         if parse_mode:
             payload["parse_mode"] = parse_mode
-            
+        
         response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status() 
+        response.raise_for_status()
         
         response_data = response.json()
         if response_data.get("ok"):
