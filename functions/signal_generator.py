@@ -85,7 +85,7 @@ def process_crypto_data(symbol, kline_data, db):
         if is_in_cooldown_period(symbol, db, config.SIGNAL_COOLDOWN_MINUTES):
             logger.info(f"{symbol} is in cooldown period. Skipping.")
             return None
-
+        
         # 2. Perform Technical Analysis
         logger.info(f"Analyzing technicals for {symbol}...")
         tech_results = analyze_technicals(kline_data)
@@ -155,12 +155,12 @@ def process_crypto_data(symbol, kline_data, db):
                 # TODO: Optionally call Gemini/external scorer for exit confidence?
                 final_signal = {
                     "type": "EXIT",
-                    "symbol": symbol,
-                    "price": price,
+                        "symbol": symbol,
+                        "price": price,
                     "confidence": local_confidence, # Or external score
                     "position_ref": position_ref_path
-                }
-            
+                    }
+                
             # --- AVERAGE DOWN Conditions (Only if no exit signal) ---
             elif not exit_signal and avg_down_count < 2: # Limit avg down attempts
                  avg_down_signal = False
@@ -176,8 +176,8 @@ def process_crypto_data(symbol, kline_data, db):
                  if avg_down_signal:
                       final_signal = {
                            "type": f"AVG_DOWN_{position_type.upper()}", # e.g., AVG_DOWN_LONG
-                           "symbol": symbol,
-                           "price": price,
+                        "symbol": symbol,
+                        "price": price,
                            "confidence": local_confidence, # Or external score
                            "position_ref": position_ref_path
                       }
@@ -197,12 +197,12 @@ def process_crypto_data(symbol, kline_data, db):
                  if avg_up_signal:
                       final_signal = {
                            "type": f"AVG_UP_{position_type.upper()}", # e.g., AVG_UP_LONG
-                           "symbol": symbol,
-                           "price": price,
+                        "symbol": symbol,
+                        "price": price,
                            "confidence": local_confidence, # Or external score
                            "position_ref": position_ref_path 
-                      }
-
+                    }
+                
         # --- Logic for NO Open Position (New Entries) ---
         else:
             logger.info(f"No open position found for {symbol}. Checking for new entry.")
@@ -243,8 +243,8 @@ def process_crypto_data(symbol, kline_data, db):
                      logger.info(f"{symbol} {final_signal_type} signal generated! Final Confidence: {final_confidence:.2f} >= {config.CONFIDENCE_THRESHOLD}")
                      final_signal = {
                           "type": final_signal_type,
-                          "symbol": symbol,
-                          "price": price,
+                    "symbol": symbol,
+                    "price": price,
                           "confidence": final_confidence,
                           # Include context for notification/saving?
                           "rsi": rsi,

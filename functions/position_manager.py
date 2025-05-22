@@ -15,7 +15,7 @@ TIMESTAMPS_COLLECTION = "signal_timestamps"
 def get_open_position(symbol: str, db):
     """
     Retrieves the currently open position document for a given symbol.
-
+    
     Args:
         symbol: The trading symbol (e.g., 'PF_XBTUSD').
         db: Firestore client instance.
@@ -73,7 +73,7 @@ def is_in_cooldown_period(symbol: str, db, cooldown_minutes: int):
         symbol: The trading symbol.
         db: Firestore client instance.
         cooldown_minutes: The cooldown duration in minutes.
-
+        
     Returns:
         True if within cooldown, False otherwise.
     """
@@ -196,7 +196,7 @@ def update_position(position_ref_path: str, signal: dict, db):
             update_payload["avg_up_count"] = avg_up_count + 1
             # Trailing stop adjustment would happen elsewhere based on price movement
             logger.info(f"Averaging up {position_data['type']} position {position_ref.id} for {signal['symbol']} at {signal_price:.2f}. New avg price: {new_avg_price:.2f}")
-        
+            
         else:
             logger.warning(f"update_position called with unexpected signal type: {signal_type}")
             return False
@@ -247,7 +247,7 @@ def close_position(position_ref_path: str, exit_price: float, db):
         position_ref.update(update_payload)
         logger.info(f"Closed {position_type} position {position_ref.id} for {position_data.get('symbol')} at {exit_price:.2f}. P/L: {profit_percentage:.2f}%")
         return True
-
+        
     except Exception as e:
          logger.error(f"Error closing position {position_ref_path}: {e}", exc_info=True)
          return False
