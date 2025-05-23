@@ -20,8 +20,6 @@ charset-normalizer==3.4.1
     # via requests
 cryptography==44.0.2
     # via pyjwt
-firebase-admin==6.8.0
-    # via repl-nix-workspace (pyproject.toml)
 functions-framework>=3.0.0,<4.0.0
 google-ai-generativelanguage==0.6.15
     # via google-generativeai
@@ -68,7 +66,7 @@ google-crc32c==1.7.1
     # via
     #   google-cloud-storage
     #   google-resumable-media
-google-generativeai==0.8.5
+google-generativeai==0.3.2
     # via repl-nix-workspace (pyproject.toml)
 google-resumable-media==2.7.2
     # via google-cloud-storage
@@ -94,7 +92,7 @@ numpy==1.26.4
     # via
     #   repl-nix-workspace (pyproject.toml)
     #   ta-lib
-pandas>=1.0.0
+pandas==2.2.1
 proto-plus==1.26.1
     # via
     #   google-ai-generativelanguage
@@ -126,9 +124,9 @@ pyjwt[crypto]==2.10.1
     # via firebase-admin
 pyparsing==3.2.3
     # via httplib2
-python-dotenv==1.1.0
+python-dotenv==1.0.1
     # via repl-nix-workspace (pyproject.toml)
-pytz==2025.2
+pytz==2024.1
     # via repl-nix-workspace (pyproject.toml)
 requests==2.31.0
     # via
@@ -138,8 +136,43 @@ requests==2.31.0
     #   repl-nix-workspace (pyproject.toml)
 urllib3==2.4.0
     # via requests
-python-telegram-bot==20.3
+python-telegram-bot==20.8
 TA-Lib-Precompiled==0.4.25
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
+
+# Additional dependencies
+pandas-ta==0.3.14b0
+
+# Telegram integration
+python-telegram-bot==20.8
+
+# Utilities
+python-dateutil==2.8.2
+
+# API clients
+lunarcrush==1.0.0  # LunarCrush API client
+krakenex==2.1.0  # Kraken API client
+
+# Core dependencies
+numpy==1.26.4
+pandas==2.2.1
+pandas-ta==0.3.14b0
+requests==2.31.0
+python-dotenv==1.0.1
+firebase-admin==6.4.0
+google-cloud-functions==1.13.4
+google-cloud-logging==3.9.0
+google-generativeai==0.3.2
+
+# API clients
+lunarcrush==1.0.0  # LunarCrush API client
+krakenex==2.1.0  # Kraken API client
+
+# Telegram integration
+python-telegram-bot==20.8
+
+# Utilities
+pytz==2024.1
+python-dateutil==2.8.2
