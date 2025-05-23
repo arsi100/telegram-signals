@@ -11,22 +11,27 @@ from telegram import Bot
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-# --- Add httpx logging configuration ---
-logging.getLogger("httpx").setLevel(logging.DEBUG)
-logging.getLogger("httpcore").setLevel(logging.DEBUG)
+# --- Fix excessive logging: Set appropriate levels ---
+# Suppress urllib3 DEBUG logs (causes ~22 connection logs per execution)
+logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 # --- End httpx logging configuration ---
 
-# --- Add python-telegram-bot logging --- 
-logging.getLogger("telegram.vendor.ptb_urllib3.urllib3.connectionpool").setLevel(logging.DEBUG)
-logging.getLogger("telegram.ext.ExtBot").setLevel(logging.DEBUG)
-logging.getLogger("telegram.bot").setLevel(logging.DEBUG)
+# --- Suppress telegram bot DEBUG logs --- 
+logging.getLogger("telegram.vendor.ptb_urllib3.urllib3.connectionpool").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext.ExtBot").setLevel(logging.WARNING)
+logging.getLogger("telegram.bot").setLevel(logging.WARNING)
 # --- End python-telegram-bot logging ---
 
-# Configure logging (original position)
+# Configure logging using config setting instead of hardcoded DEBUG
 log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
-logging.basicConfig(level=logging.DEBUG, format=log_format, force=True)
+# Import config first to get LOG_LEVEL
+from . import config
+log_level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
+logging.basicConfig(level=log_level, format=log_format, force=True)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(log_level)
 
 # Global flags and db client
 IMPORTS_SUCCESSFUL = False

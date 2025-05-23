@@ -25,7 +25,6 @@ def get_open_position(symbol: str, db):
         or None if no open position is found or an error occurs.
     """
     try:
-        logger.debug(f"Querying open position for {symbol} in {POSITIONS_COLLECTION}")
         query = db.collection(POSITIONS_COLLECTION)\
                   .where("symbol", "==", symbol)\
                   .where("status", "==", "open")\
@@ -41,7 +40,6 @@ def get_open_position(symbol: str, db):
             logger.info(f"Found open {position_data.get('type', '')} position for {symbol}: {position_doc.id}")
             return position_data
         else:
-            logger.debug(f"No open position found for {symbol}")
             return None
             
     except Exception as e:
@@ -82,7 +80,6 @@ def is_in_cooldown_period(symbol: str, db, cooldown_minutes: int):
         doc_snapshot = doc_ref.get()
 
         if not doc_snapshot.exists:
-            logger.debug(f"No previous signal timestamp found for {symbol}, not in cooldown.")
             return False # No timestamp means not in cooldown
 
         timestamp_data = doc_snapshot.to_dict()
@@ -103,7 +100,7 @@ def is_in_cooldown_period(symbol: str, db, cooldown_minutes: int):
             logger.info(f"{symbol} is within {cooldown_minutes}m cooldown period. Last signal: {last_signal_ts}")
             return True
         else:
-            logger.debug(f"{symbol} is outside cooldown period. Last signal: {last_signal_ts}")
+            # Only log if actually in cooldown - remove routine "outside cooldown" DEBUG logs
             return False
 
     except Exception as e:
