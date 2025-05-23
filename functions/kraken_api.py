@@ -3,6 +3,7 @@ import logging
 import datetime
 import time
 import math # Import math for timestamp calculation if needed
+from typing import Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -15,12 +16,16 @@ RESOLUTION = "5m" # Resolution parameter for the API path
 TICK_TYPE = "trade" # Tick type parameter for the API path
 # DATA_LIMIT = 150 # We don't use limit directly, API might have default or use from/to
 
-def fetch_kline_data(symbol: str):
+def fetch_kline_data(symbol: str, resolution: str = "5m", limit: Optional[int] = None, from_timestamp_sec: Optional[int] = None, to_timestamp_sec: Optional[int] = None):
     """
     Fetches Kline (OHLCV) data for a given symbol from the Kraken Futures Charts API.
 
     Args:
-        symbol: The trading pair symbol (e.g., 'PF_XBTUSD', 'PF_ETHUSD').
+        symbol: The trading pair symbol (e.g., 'PF_XBTUSD').
+        resolution: Candlestick resolution (e.g., '5m', '15m', '1h').
+        limit: Number of candles to fetch (used to calculate 'from_timestamp_sec' if 'from_timestamp_sec' is not set and 'to_timestamp_sec' is now).
+        from_timestamp_sec: Start timestamp in seconds.
+        to_timestamp_sec: End timestamp in seconds.
 
     Returns:
         A list of dictionaries, where each dictionary represents a candlestick
@@ -28,20 +33,39 @@ def fetch_kline_data(symbol: str):
         or None if an error occurs. Returns data in ascending time order (oldest first).
     """
     # Construct the endpoint using path parameters
-    endpoint = f"/{TICK_TYPE}/{symbol}/{RESOLUTION}"
-    
-    # Optional: Calculate 'from' timestamp to fetch a specific number of candles
-    # Example: Fetch last 150 candles (150 * 5 minutes = 750 minutes = 45000 seconds)
-    # now_seconds = math.floor(time.time())
-    # from_seconds = now_seconds - (150 * 5 * 60) 
-    # params = {'from': from_seconds}
-    
-    # For now, fetch default (likely most recent) candles without from/to
-    params = {} 
-    
+    endpoint = f"/{TICK_TYPE}/{symbol}/{resolution}"
     api_url = f"{KRAKEN_FUTURES_API_BASE_URL}{endpoint}"
     
-    logger.info(f"Fetching Kraken Kline data for {symbol} from {api_url}")
+    params = {}
+    if to_timestamp_sec:
+        params['to'] = to_timestamp_sec
+    if from_timestamp_sec:
+        params['from'] = from_timestamp_sec
+    elif limit and not from_timestamp_sec: # Use limit to calculate 'from' if 'from' is not specified
+        # If 'to' is also not specified, assume we want N most recent candles up to now.
+        # If 'to' IS specified, 'limit' might be tricky as Kraken prioritizes from/to.
+        # For now, we'll calculate 'from' to get 'limit' candles ending 'now' or at 'to_timestamp_sec'.
+        
+        end_time_for_limit_calc = to_timestamp_sec if to_timestamp_sec else math.floor(time.time())
+        
+        res_seconds = 0
+        if "m" in resolution:
+            res_val = resolution.replace("m", "")
+            if res_val.isdigit():
+                res_seconds = int(res_val) * 60
+        elif "h" in resolution:
+            res_val = resolution.replace("h", "")
+            if res_val.isdigit():
+                res_seconds = int(res_val) * 3600
+        
+        if res_seconds > 0:
+            params['from'] = end_time_for_limit_calc - (limit * res_seconds)
+            if not to_timestamp_sec: # If 'to' wasn't specified, set it to now
+                 params['to'] = end_time_for_limit_calc
+        else:
+            logger.warning(f"Could not parse resolution '{resolution}' for limit calculation or resolution was 0. Fetching default for {symbol}.")
+    
+    logger.info(f"Fetching Kraken Kline data for {symbol} ({resolution}) from {api_url} with params: {params}")
     
     try:
         response = requests.get(api_url, params=params, timeout=15) # Increased timeout slightly

@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import pandas as pd
 from . import config
-from .kraken_api import get_kline_data
+from .kraken_api import fetch_kline_data
 from .technical_analysis import calculate_rsi, calculate_ema
 
 # Configure logging
@@ -24,7 +24,7 @@ def analyze_higher_timeframes(symbol):
             logger.info(f"Analyzing {timeframe} timeframe for {symbol}")
             
             # Get kline data for higher timeframe
-            kline_data = get_kline_data(symbol, timeframe, limit=100)
+            kline_data = fetch_kline_data(symbol=symbol, resolution=timeframe, limit=100)
             if not kline_data:
                 logger.warning(f"No kline data for {symbol} on {timeframe}")
                 continue
