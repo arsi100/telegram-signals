@@ -4,7 +4,7 @@ import pytz
 
 # Use relative imports
 from .technical_analysis import analyze_technicals
-from .confidence_calculator import get_confidence_score
+from .confidence_calculator import get_confidence_score, calculate_enhanced_local_confidence
 from .position_manager import get_open_position, is_in_cooldown_period, record_signal_ts
 from .utils import is_market_hours # Assuming utils.py exists and is needed
 from . import config
@@ -223,9 +223,9 @@ def process_crypto_data(symbol, kline_data, db):
                      final_signal_type = "SHORT"
                      
             if entry_signal_conditions_met:
-                # Calculate local confidence first as a mandatory step / fallback
-                local_confidence = calculate_local_confidence(tech_results)
-                logger.info(f"Calculated local confidence for {symbol} {final_signal_type}: {local_confidence:.2f}")
+                # Calculate enhanced local confidence first as a mandatory step / fallback
+                local_confidence = calculate_enhanced_local_confidence(symbol, final_signal_type, tech_results)
+                logger.info(f"Calculated enhanced local confidence for {symbol} {final_signal_type}: {local_confidence:.2f}")
                 
                 # Attempt to get Gemini confidence score
                 logger.info(f"Attempting to get Gemini confidence score for {symbol} {final_signal_type}...")
@@ -236,7 +236,7 @@ def process_crypto_data(symbol, kline_data, db):
                     logger.info(f"Received Gemini confidence score: {gemini_confidence:.2f}")
                     final_confidence = gemini_confidence # Use Gemini score if available
                 else:
-                    logger.warning(f"Gemini confidence score failed for {symbol} {final_signal_type}. Falling back to local score: {local_confidence:.2f}")
+                    logger.warning(f"Gemini confidence score failed for {symbol} {final_signal_type}. Falling back to enhanced local score: {local_confidence:.2f}")
 
                 # Final check against threshold
                 if final_confidence >= config.CONFIDENCE_THRESHOLD:
@@ -249,7 +249,8 @@ def process_crypto_data(symbol, kline_data, db):
                           # Include context for notification/saving?
                           "rsi": rsi,
                           "ema": ema,
-                          "volume_ratio": tech_results['raw_volume_analysis'].get('volume_ratio', 1.0)
+                          "volume_ratio": tech_results['raw_volume_analysis'].get('volume_ratio', 1.0),
+                          "atr_filter": atr_filter_passed,
                           # TODO: Add long-term trend from external AI?
                      }
                 else:

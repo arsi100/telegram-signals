@@ -82,3 +82,24 @@ ATR_MULTIPLIER = 1.5  # ATR must be >1.5x 20-period average
 # New additions
 KLINE_INTERVAL = "5m"  # Changed from 15m to 5m for primary analysis
 KLINE_LIMIT = 2000     # Increased from 100 to 2000 for more historical data
+
+# Multi-timeframe Analysis - Phase 1 implementation
+PRIMARY_TIMEFRAME = "5m"    # Primary analysis timeframe
+SECONDARY_TIMEFRAMES = ["15m", "1h"]  # Secondary timeframes for trend confirmation
+MULTI_TIMEFRAME_ENABLED = True  # Enable multi-timeframe analysis
+
+# Candlestick Pattern Configuration - Phase 1 optimization
+CANDLE_BODY_STRENGTH_FACTOR = 1.2  # Body must be >1.2x average body size
+HAMMER_WICK_RATIO = 2.0  # Lower wick must be >2x body size
+HAMMER_UPPER_WICK_MAX_RATIO = 0.3  # Upper wick must be <0.3x body size
+SHOOTING_STAR_WICK_RATIO = 2.0  # Upper wick must be >2x body size
+SHOOTING_STAR_LOWER_WICK_MAX_RATIO = 0.3  # Lower wick must be <0.3x body size
+ENGULFING_BODY_FACTOR = 1.1  # Engulfing body must be >1.1x previous body
+
+# Sentiment Analysis Configuration - DISABLED for Phase 1
+SENTIMENT_ANALYSIS_ENABLED = False  # Disabled - no real sentiment data sources yet
+SENTIMENT_WEIGHT = 0  # Disabled
+SENTIMENT_SOURCES = []  # Disabled
+SENTIMENT_LOOKBACK_HOURS = 24  # Placeholder for future implementation
+SENTIMENT_THRESHOLD_BULLISH = 0.6  # Placeholder for future implementation
+SENTIMENT_THRESHOLD_BEARISH = -0.6  # Placeholder for future implementation
