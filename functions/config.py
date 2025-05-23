@@ -76,6 +76,7 @@ SIGNAL_COOLDOWN_MINUTES = 15
 # Technical analysis parameters - Updated for Phase 1 optimization
 RSI_PERIOD = 7  # Changed from 14 to 7 for more responsive 5-minute charts
 EMA_PERIOD = 20  # Changed from 50 to 20 for faster signals
+SMA_PERIOD = 14  # Added: Simple Moving Average period
 VOLUME_PERIOD = 10  # Changed from 20 to 10 for more responsive volume analysis
 
 # RSI Thresholds - Phase 1 optimization
