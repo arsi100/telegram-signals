@@ -125,7 +125,7 @@ ENGULFING_BODY_FACTOR = 1.5
 
 # Sentiment Analysis Configuration - ENABLED with LunarCrush
 SENTIMENT_ANALYSIS_ENABLED = True  # Reverted back to True
-SENTIMENT_WEIGHT = 0.1  # 10% of confidence score
+SENTIMENT_WEIGHT = 0.20  # 20% of confidence score (NEW)
 SENTIMENT_SOURCES = ['lunarcrush']  # Using LunarCrush as primary source
 SENTIMENT_LOOKBACK_HOURS = 24
 SENTIMENT_THRESHOLD_BULLISH = 4.0  # ASS > 4.0 for bullish sentiment
@@ -145,10 +145,10 @@ MIN_CONFIDENCE_AVG = 70
 # Confidence Score Weights
 CONFIDENCE_WEIGHTS = {
     'pattern': 0.35,      # 35% for pattern detection
-    'rsi': 0.25,          # 25% for RSI
-    'volume': 0.20,       # 20% for volume analysis
-    'ema': 0.10,          # 10% for EMA trend
-    'multi_timeframe': 0.10,  # 10% for multi-timeframe confirmation
-    'sentiment': 0.10,    # 10% for sentiment analysis
-    'social_volume': 0.05  # 5% bonus for high social volume
+    'rsi': 0.15,          # 15% for RSI (Momentum proxy)
+    'volume': 0.30,       # 30% for volume analysis
+    'ema': 0.0,           # 0% for EMA trend (NEW - effectively removed from main score)
+    'multi_timeframe': 0.0, # 0% for multi-timeframe (NEW - effectively removed)
+    'sentiment': 0.0,     # 0% direct weight here (NEW - handled by SENTIMENT_WEIGHT)
+    'social_volume': 0.0  # 0% direct weight here (NEW - bonus part of sentiment logic)
 }
