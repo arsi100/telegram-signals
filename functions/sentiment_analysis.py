@@ -239,7 +239,7 @@ def _get_social_sentiment(symbol):
         logger.error(f"Error getting social sentiment for {symbol}: {e}")
         return None
 
-def get_sentiment_score(symbol, signal_direction):
+def calculate_directional_sentiment_adjustment(symbol, signal_direction):
     """
     Get sentiment score for signal direction.
     Returns score between 0-15 based on sentiment alignment.
