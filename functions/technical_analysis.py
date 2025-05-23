@@ -163,35 +163,42 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
     """
     Advanced volume analysis based on institutional trading research.
     Implements multi-tier volume classification and order flow detection.
+    Adds EWMA of volume, EWMA of price range (volatility), and their correlation.
     """
     try:
         default_result_latest = {
             'current_volume': 0.0,
-            'avg_volume': 0.0,
-            'volume_ratio': 0.0,
+            'avg_volume': 0.0, # Typically 20-period SMA of volume
+            'volume_ratio': 0.0, # current_volume / avg_volume
             'volume_tier': 'UNKNOWN',
             'volume_momentum': 0.0,
-            'volume_profile_strength': 0.0,
+            'volume_profile_strength': 0.0, # Original price-volume correlation
             'early_trend_signal': False,
             'late_entry_warning': False,
-            'institutional_activity': False
+            'institutional_activity': False,
+            'volume_ewma': 0.0,
+            'price_range_ewma': 0.0,
+            'vol_volatility_correlation': 0.0
         }
         
-        if df.empty or 'volume' not in df.columns:
-            logger.warning("analyze_volume_advanced: No volume data available")
+        if df.empty or 'volume' not in df.columns or 'high' not in df.columns or 'low' not in df.columns:
+            logger.warning("analyze_volume_advanced: Missing volume, high, or low data.")
             return default_result_latest
 
         # Calculate various volume metrics
         current_volume = float(df['volume'].iloc[-1])
         
         # Multi-period volume averages (institutional approach)
+        volume_10_sma = df['volume'].rolling(window=10, min_periods=1).mean().iloc[-1] # For tier reference
         volume_5 = df['volume'].tail(5).mean()
         volume_20 = df['volume'].tail(20).mean() 
         volume_50 = df['volume'].tail(50).mean() if len(df) >= 50 else df['volume'].mean()
         volume_200 = df['volume'].tail(200).mean() if len(df) >= 200 else df['volume'].mean()
         
+        avg_volume_for_ratio = volume_10_sma if volume_10_sma > 0 else (volume_20 if volume_20 > 0 else 1) # Use 10-period SMA for ratio
+
         # Volume ratios for different timeframes
-        ratio_current = current_volume / volume_20 if volume_20 > 0 else 0
+        ratio_current = current_volume / avg_volume_for_ratio if avg_volume_for_ratio > 0 else 0
         ratio_short = volume_5 / volume_20 if volume_20 > 0 else 0
         ratio_medium = volume_20 / volume_50 if volume_50 > 0 else 0
         ratio_long = volume_50 / volume_200 if volume_200 > 0 else 0
@@ -203,7 +210,7 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
         else:
             volume_momentum = 0
             
-        # Volume Profile Strength (price-volume relationship)
+        # Volume Profile Strength (original price-volume relationship)
         if len(df) >= 20:
             price_returns = df['close'].pct_change().tail(20)
             volume_changes = df['volume'].pct_change().tail(20)
@@ -212,46 +219,68 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
         else:
             volume_profile_strength = 0
             
-        # Tier Classification (Based on Institutional Research)
-        if ratio_current >= 2.5:
-            volume_tier = 'EXTREME'  # Likely news/manipulation
-            late_entry_warning = True
-        elif ratio_current >= 1.8:
-            volume_tier = 'HIGH'     # Late institutional/retail FOMO
-            late_entry_warning = True
-        elif ratio_current >= 1.3:
-            volume_tier = 'ELEVATED' # Good entry with confirmation
-        elif ratio_current >= 1.0:
-            volume_tier = 'NORMAL'   # Early trend potential
-        elif ratio_current >= 0.7:
-            volume_tier = 'LOW'      # Consolidation
-        else:
-            volume_tier = 'VERY_LOW' # Dead zone
+        # EWMA calculations (alpha=0.1)
+        alpha_ewma = 0.1
+        volume_ewma_series = df['volume'].ewm(alpha=alpha_ewma, adjust=False).mean()
+        latest_volume_ewma = volume_ewma_series.iloc[-1]
+
+        df['price_range'] = df['high'] - df['low']
+        price_range_ewma_series = df['price_range'].ewm(alpha=alpha_ewma, adjust=False).mean()
+        latest_price_range_ewma = price_range_ewma_series.iloc[-1]
+
+        vol_volatility_correlation = 0.0
+        if len(df) >= 20: # Need enough data for correlation
+            # Ensure series have the same index for correlation
+            corr_df = pd.DataFrame({
+                'vol_ewma': volume_ewma_series.tail(20),
+                'pr_ewma': price_range_ewma_series.tail(20)
+            })
+            # Only calculate correlation if both series have non-zero variance
+            if corr_df['vol_ewma'].var() > 1e-6 and corr_df['pr_ewma'].var() > 1e-6:
+                 vol_volatility_correlation = corr_df['vol_ewma'].corr(corr_df['pr_ewma'])
+                 if pd.isna(vol_volatility_correlation): vol_volatility_correlation = 0.0
+            else:
+                vol_volatility_correlation = 0.0 # or some other default if variance is zero
+
+
+        # Tier Classification (Refined based on current_volume / 10-period SMA of volume)
+        if ratio_current > 2.0: # EXTREME >2x
+            volume_tier = 'EXTREME'
+        elif ratio_current >= 1.5: # HIGH 1.5-2x
+            volume_tier = 'HIGH'
+        elif ratio_current >= 1.2: # ELEVATED 1.2-1.5x
+            volume_tier = 'ELEVATED'
+        elif ratio_current >= 0.8: # NORMAL 0.8-1.2x
+            volume_tier = 'NORMAL'
+        elif ratio_current >= 0.5: # LOW 0.5-0.8x
+            volume_tier = 'LOW'
+        else: # VERY_LOW <0.5x
+            volume_tier = 'VERY_LOW'
             
-        # Early Trend Detection (Quant Approach)
+        # Early Trend Detection (Quant Approach) - adjust criteria if needed
         early_trend_signal = (
-            1.0 <= ratio_current <= 1.4 and  # Optimal volume range
+            1.0 <= ratio_current <= 1.4 and  # Optimal volume range (consider adjusting based on new tiers)
             volume_momentum > 0 and           # Volume trending up
             ratio_short > 1.1 and            # Recent acceleration
             volume_profile_strength > 0.3    # Good price-volume correlation
         )
         
-        # Institutional Activity Detection
+        # Institutional Activity Detection - adjust criteria if needed
         institutional_activity = (
             ratio_current > 1.2 and 
             volume_profile_strength > 0.4 and
             current_volume > volume_200 * 1.5  # Significant vs long-term average
         )
         
-        # Late Entry Warning
+        # Late Entry Warning - adjust criteria if needed
         late_entry_warning = (
-            ratio_current > 1.8 or 
+            ratio_current > 1.8 or # Corresponds to HIGH/EXTREME
             (ratio_current > 1.5 and volume_momentum < 0)  # High volume but declining
         )
         
         result = {
             'current_volume': current_volume,
-            'avg_volume': volume_20,
+            'avg_volume': avg_volume_for_ratio, # Changed to reflect the base for ratio_current
             'volume_ratio': ratio_current,
             'volume_tier': volume_tier,
             'volume_momentum': volume_momentum,
@@ -261,14 +290,22 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
             'institutional_activity': institutional_activity,
             'ratio_short': ratio_short,
             'ratio_medium': ratio_medium,
-            'ratio_long': ratio_long
+            'ratio_long': ratio_long,
+            'volume_ewma': latest_volume_ewma,
+            'price_range_ewma': latest_price_range_ewma,
+            'vol_volatility_correlation': vol_volatility_correlation
         }
 
         if return_all:
-            # For backtesting - return series data
+            # For backtesting - return series data, including new EWMAs
+            # Note: This part might need more fleshing out if full series are needed for all new metrics
             return {
-                'volume_ratio_series': (df['volume'] / df['volume'].rolling(20).mean()).fillna(0),
+                'volume_ratio_series': (df['volume'] / df['volume'].rolling(10, min_periods=1).mean()).fillna(0), # Based on 10-period SMA
                 'volume_momentum_series': df['volume'].rolling(10).apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 else 0),
+                'volume_ewma_series': volume_ewma_series,
+                'price_range_ewma_series': price_range_ewma_series,
+                # Placeholder for correlation series if needed for backtesting
+                # 'vol_volatility_correlation_series': df['volume_ewma_series'].rolling(20).corr(df['price_range_ewma_series']),
                 'latest_result': result
             }
         else:
