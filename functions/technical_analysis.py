@@ -197,12 +197,20 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
         return default_result_all_confirmed if return_all else default_result_latest
 
     try:
-        # Use the strategy method to get candlestick patterns
-        # This will append columns to df like CDL_HAMMER, CDL_SHOOTINGSTAR, CDL_ENGULFING
-        # Ensure the DataFrame has standard OHLC column names if not specifying them in the strategy.
-        # _ensure_dataframe should have handled this, but let's be explicit if needed.
-        # Standard column names for pandas-ta often are lowercase: open, high, low, close, volume
-        df.ta.strategy("candles", open='open', high='high', low='low', close='close', append=True)
+        # Load only the specific candlestick patterns we need instead of all patterns
+        # This avoids TA-Lib warnings for patterns we don't use
+        try:
+            # Only load the 4 patterns we actually need
+            df.ta.cdl_hammer(append=True)
+            df.ta.cdl_shootingstar(append=True) 
+            df.ta.cdl_engulfing(append=True)
+        except Exception as e:
+            logger.warning(f"Error loading specific candlestick patterns: {e}")
+            # Fallback: create empty columns if pattern loading fails
+            series_len = len(df)
+            df["CDL_HAMMER"] = pd.Series([0]*series_len, index=df.index)
+            df["CDL_SHOOTINGSTAR"] = pd.Series([0]*series_len, index=df.index)
+            df["CDL_ENGULFING"] = pd.Series([0]*series_len, index=df.index)
 
         # Access the appended columns
         # pandas-ta cdl functions return 0 (no pattern), 100 (bullish), or -100 (bearish)
