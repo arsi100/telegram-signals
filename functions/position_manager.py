@@ -116,13 +116,20 @@ def save_position(signal: dict, db):
     """
     try:
         entry_price = signal['price']
-        position_type = signal['type'] # Assumed to be LONG or SHORT
+        position_type_raw = signal['type'] # Should be BUY, SELL, etc.
         
+        # Map BUY/SELL to LONG/SHORT for SL/TP logic consistency
+        position_type_for_logic = None
+        if position_type_raw == "BUY":
+            position_type_for_logic = "LONG"
+        elif position_type_raw == "SELL":
+            position_type_for_logic = "SHORT"
+
         # Calculate initial SL/TP (optional but good practice)
-        if position_type == "LONG":
+        if position_type_for_logic == "LONG":
             initial_stop_loss = entry_price * (1 - 0.02) # 2% SL
             initial_take_profit = entry_price * (1 + 0.03) # 3% TP
-        elif position_type == "SHORT":
+        elif position_type_for_logic == "SHORT":
              initial_stop_loss = entry_price * (1 + 0.02) # 2% SL
              initial_take_profit = entry_price * (1 - 0.03) # 3% TP
         else:
@@ -131,7 +138,7 @@ def save_position(signal: dict, db):
             
         position_data = {
             "symbol": signal["symbol"],
-            "type": position_type,
+            "type": position_type_raw, # Store the original type e.g. BUY/SELL
             "entry_price": entry_price,
             "avg_price": entry_price, # Initial average price is entry price
             "confidence": signal["confidence"],
@@ -147,7 +154,7 @@ def save_position(signal: dict, db):
         
         # Add the position to Firestore
         _ , position_ref = db.collection(POSITIONS_COLLECTION).add(position_data)
-        logger.info(f"Saved new {position_type} position for {signal['symbol']} at {entry_price:.2f}. Ref: {position_ref.id}")
+        logger.info(f"Saved new {position_type_raw} position for {signal['symbol']} at {entry_price:.2f}. Ref: {position_ref.id}")
         return position_ref
         
     except Exception as e:

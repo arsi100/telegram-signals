@@ -99,10 +99,10 @@ This was the most complex part due to an Organization Policy (`constraints/cloud
 
 ## 7. Dependency Management (`functions/requirements.txt`)
 
-*   **`ta-lib` Saga:**
+*   **`TA-Lib` Saga:**
     *   Initial attempts with `TA-Lib` failed during Cloud Build due to missing C dependencies.
     *   Switched to `TA-Lib-Precompiled==0.4.25`. This worked but introduced `numpy` version sensitivity (required `numpy==1.26.4`).
-    *   Ultimately, `TA-Lib` and `TA-Lib-Precompiled` were replaced with **`pandas-ta`** to simplify dependencies and resolve build/runtime issues, especially on macOS arm64 for local dev and for smoother cloud builds. `technical_analysis.py` was refactored to use `pandas-ta`.
+    *   Ultimately, `TA-Lib` and `TA-Lib-Precompiled` were replaced with **`pandas-ta`** to simplify dependencies and resolve build/runtime issues. `technical_analysis.py` was refactored to use `pandas-ta`. This is the current approach.
 *   **Python Version:** Started with Python 3.12, but `TA-Lib-Precompiled` (and other potential incompatibilities) led to a switch to Python 3.11, which was more stable with the chosen dependencies.
 *   **`python-telegram-bot`:** Was initially missing from `requirements.txt`, causing `ModuleNotFoundError` at runtime. Adding `python-telegram-bot==20.3` (or a compatible version) resolved this.
 *   **`pandas`:** A `ModuleNotFoundError: No module named 'pandas'` occurred despite it being in `requirements.txt`. This was mysteriously resolved by a forced rebuild/redeployment, suggesting a potential caching or build artifact issue that a clean build fixed. Ensure `pandas>=1.0.0` (or a specific working version) is present.
@@ -111,7 +111,7 @@ This was the most complex part due to an Organization Policy (`constraints/cloud
 
 *   Ensure a Firestore database is created in Native mode in a compatible region (e.g., `us-central1` or `nam5` if the function is in `us-central1`).
 *   The function's runtime service account needs `roles/datastore.user`.
-*   **Local Firestore Emulation/Connection:** For local development (`functions-framework`), `GOOGLE_APPLICATION_CREDENTIALS` environment variable must point to a valid service account JSON key file.
+*   **Local Firestore Emulation/Connection:** For local development (`functions-framework`), `GOOGLE_APPLICATION_CREDENTIALS` environment variable must point to a valid service account JSON key file. Ensure Kraken API access (if needed for local tests beyond public data) is handled via `.env` or similar local config.
     *   Encountered `google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.')` locally. This was resolved by regenerating the `firebase-adminsdk-fbsvc@...` service account key from GCP IAM & Admin -> Service Accounts, downloading the new JSON, and updating the local `service-account.json` file referenced by `GOOGLE_APPLICATION_CREDENTIALS`.
 
 ## 9. Cloud Scheduler Job Creation

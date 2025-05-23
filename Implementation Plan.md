@@ -10,10 +10,10 @@ This document outlines the remaining tasks to complete the Cryptocurrency Tradin
     *   [ ] Document how to set up environment variables for Cloud Function deployment.
 
 2.  **Technical Analysis Module (`functions/technical_analysis.py`):**
-    *   [ ] Finalize TA-Lib pattern detection (`detect_patterns`) for Hammer, Shooting Star, Engulfing patterns.
-    *   [ ] Implement pattern confirmation logic (based on the follow-up candle).
-    *   [ ] Ensure `calculate_indicators` (RSI, SMA) and average volume calculation are robust.
-    *   [ ] Verify data preprocessing for TA-Lib functions.
+    *   [ ] Verify `pandas-ta` pattern detection (`detect_patterns`) for Hammer, Shooting Star, Engulfing patterns aligns with strategy.
+    *   [ ] Verify pattern confirmation logic (based on the follow-up candle) is correctly implemented.
+    *   [ ] Ensure `calculate_indicators` (RSI, SMA) and average volume calculation using `pandas-ta` are robust.
+    *   [ ] Verify data preprocessing for `pandas-ta` functions.
 
 3.  **Confidence Scoring Module (`functions/confidence_calculator.py`):**
     *   [ ] Fully integrate the `get_confidence` call using the Gemini API (`gemini-1.5-flash` or similar).
@@ -22,17 +22,17 @@ This document outlines the remaining tasks to complete the Cryptocurrency Tradin
     *   [ ] Implement the fallback algorithm mentioned in the status report (if Gemini fails).
 
 4.  **Signal Generation Logic (`functions/signal_generator.py` - `process_crypto_data`):**
-    *   [ ] Integrate results from `technical_analysis.py` and `confidence_calculator.py`.
-    *   [ ] Implement the check for all 8 strict conditions defined in `Trading Signal Application.md` for generating Long/Short signals:
-        *   [ ] Candlestick Pattern Confirmed
+    *   [x] Integrate results from `technical_analysis.py` (KeyErrors related to this fixed in commit `ace1248`).
+    *   [ ] Integrate `confidence_calculator.py` results.
+    *   [ ] Implement/Verify the check for all 8 strict conditions defined in `Trading Signal Application.md` (updated for Kraken & Market Hour clarification) for generating Long/Short signals:
+        *   [ ] Candlestick Pattern Confirmed (using `pandas-ta`)
         *   [ ] RSI Alignment (<30 Long / >70 Short)
         *   [ ] High Trading Volume (> 50-period Avg)
         *   [ ] Trend Confirmation via SMA (Price < SMA Long / Price > SMA Short)
         *   [ ] Confidence Score > 80 (from Gemini)
         *   [ ] No conflicting open position
         *   [ ] Cooldown Period (15 min since last Long/Short for the same coin) - Requires Firestore check.
-        *   ~~[ ] Market Hours (Removed)~~ 
-    *   [ ] Implement logic for Exit and Average Down signals based on P/L targets and secondary confirmations, using data from `position_manager.py`.
+        *   [ ] Strategic Market Activity Windows: Ensure this consideration is appropriately factored into signal evaluation if desired (e.g., within `process_crypto_data` or by `is_market_hours` in `utils.py`).
 
 5.  **Position Management Module (`functions/position_manager.py`):**
     *   [ ] Finalize Firestore schema for the `positions` collection.
@@ -58,7 +58,7 @@ This document outlines the remaining tasks to complete the Cryptocurrency Tradin
     *   [ ] Test API interactions (Bybit, Gemini, Telegram) with mock data or sandbox environments if possible.
     *   [ ] Test Firestore read/write operations for signals and positions.
 *   [ ] **End-to-End Testing:**
-    *   [ ] Run the `run_signal_generation` function locally (using `service-account.json` and `.env` file) or deploy to a test Firebase environment.
+    *   [ ] Run the `run_signal_generation` function locally (using `service-account.json` and `.env` file with Kraken keys if needed) or deploy to a test Firebase environment.
     *   [ ] Trigger the function and monitor logs, Firestore data, and Telegram messages.
     *   [ ] Validate signal generation against known historical data scenarios.
 *   [ ] **Backtesting (Optional but Recommended):**
@@ -87,6 +87,6 @@ This document outlines the remaining tasks to complete the Cryptocurrency Tradin
 
 ## Dependencies/External Factors
 
-*   [ ] Ensure TA-Lib C library installation is handled correctly for Cloud Functions environment (may require specifying packages in `functions/requirements.txt` or configuring the build environment).
-*   [ ] Monitor API rate limits (Bybit, Gemini, Telegram).
+*   [x] `pandas-ta` is used for TA, simplifying C library dependencies.
+*   [ ] Monitor API rate limits (Kraken, Gemini, Telegram).
 *   [ ] Manage Firebase free tier quotas. 

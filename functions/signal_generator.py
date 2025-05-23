@@ -248,8 +248,8 @@ def process_crypto_data(symbol, kline_data, db):
                           # Include context for notification/saving?
                           "rsi": rsi,
                           "sma": sma,
-                          "volume_ratio": tech_results['raw_volume_analysis'].get('volume_ratio', 1.0) # Correctly access volume_ratio
-                            # TODO: Add long-term trend from external AI?
+                          "volume_ratio": tech_results['raw_volume_analysis'].get('volume_ratio', 1.0)
+                          # TODO: Add long-term trend from external AI?
                      }
                 else:
                     logger.info(f"{symbol} {final_signal_type} signal final confidence {final_confidence:.2f} below threshold {config.CONFIDENCE_THRESHOLD}.")

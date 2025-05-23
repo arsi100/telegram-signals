@@ -1,21 +1,21 @@
     # Project: Cryptocurrency Trading Signal Application
 
     ## Objective
-    Build a Python-based application deployed on Firebase's free tier that monitors 5-minute candlestick charts for user-defined cryptocurrencies (futures/perpetual contracts) on Bybit. The application generates leveraged long, short, exit, or average down signals with confidence scores and sends them via a Telegram bot. The focus is on identifying 1-3% price movements (~10-30% returns with 10x leverage) based on strict technical analysis conditions during specific market hours. The application tracks open positions in Firestore but does not execute trades automatically.
+    Build a Python-based application deployed on Firebase's free tier that monitors 5-minute candlestick charts for user-defined cryptocurrencies (futures/perpetual contracts) on Kraken. The application generates leveraged long, short, exit, or average down signals with confidence scores and sends them via a Telegram bot. The focus is on identifying 1-3% price movements (~10-30% returns with 10x leverage) based on strict technical analysis conditions, ideally during specific windows of heightened market activity. The application tracks open positions in Firestore but does not execute trades automatically.
 
     ## Context & Background
-    - **Target User:** Client using a Bybit margin account for leveraged (10x) futures trading.
+    - **Target User:** Client using a margin account for leveraged (10x) futures trading.
     - **Trading Strategy:** Manually executed trades based on high-probability signals, aiming for small, frequent gains during volatile periods. Relies on technical indicators and pattern recognition, cross-referenced with an existing external AI for long-term trend validation.
-    - **Technical Constraints:** Must run on Firebase free tier (Cloud Functions, Firestore). Utilizes Bybit API (V5), Telegram Bot API, Google Gemini (free tier) for scoring, and potentially CryptoCompare as a data backup. Requires TA-Lib for technical analysis.
+    - **Technical Constraints:** Must run on Firebase free tier (Cloud Functions, Firestore). Utilizes Kraken API, Telegram Bot API, Google Gemini (free tier) for scoring, and potentially CryptoCompare as a data backup. Requires `pandas-ta` for technical analysis.
     - **Developer:** Skilled in Python, Telegram bots, Firebase; limited margin trading knowledge. Prefers cost-free solutions.
 
     ## Core Requirements & Features
     1.  **Deployment:** Firebase Cloud Functions & Firestore (Free Tier).
-    2.  **Data Source:** Bybit V5 API (Kline endpoint/WebSocket for 5-min candles, `category=linear`). CryptoCompare as backup.
+    2.  **Data Source:** Kraken API (Kline endpoint for 5-min candles). CryptoCompare as backup.
     3.  **AI Integration:** Google Gemini for confidence scoring (0-100). Grok 3 as alternative. External AI for long-term trend (via API call).
     4.  **Signal Delivery:** Telegram Bot.
     5.  **Monitored Assets:** User-defined list (initially 5-10 high-liquidity pairs like BTCUSDT, ETHUSDT) stored in Firestore/config.
-    6.  **Market Hours:** Signals generated only during specific UTC windows:
+    6.  **Market Activity Windows (Strategic Consideration):** Signals are ideally identified during specific UTC windows believed to have higher market activity and potential for short-term opportunities. These are not necessarily hard gates for function execution but inform the strategic timing of analysis:
         - 00:00 – 02:30
         - 05:30 – 07:00
         - 07:45 – 10:00
@@ -26,7 +26,7 @@
 
     ## Strict Conditions for Signal Generation (Confidence Score > 80)
     Signals are generated based on a weighted combination of factors, calculated every 5 minutes during market hours, but only sent if **all** applicable conditions are met:
-    1.  **Candlestick Pattern (40%):** Reliable bullish (Hammer, Bullish Engulfing) or bearish (Shooting Star, Bearish Engulfing) pattern detected by TA-Lib, confirmed by follow-up candle.
+    1.  **Candlestick Pattern (40%):** Reliable bullish (Hammer, Bullish Engulfing) or bearish (Shooting Star, Bearish Engulfing) pattern detected using `pandas-ta`, confirmed by follow-up candle.
     2.  **RSI Alignment (30%):** 14-period RSI < 30 (oversold) for Long, > 70 (overbought) for Short.
     3.  **High Trading Volume (20%):** Current 5-min volume > 50-period average volume.
     4.  **Trend Confirmation via SMA (10%):** Price relative to 50-period SMA must align (Price < SMA for Long, Price > SMA for Short).
@@ -49,20 +49,20 @@
         - [x] Create `project_doc.md` (Manual).
         - [ ] Create `main.py`.
         - [ ] Create `README.md`.
-        - [ ] Obtain API Keys (Bybit, CryptoCompare, Gemini, Telegram Bot Token, Existing AI API). Store securely (e.g., Firebase environment variables or Secret Manager).
+        - [ ] Obtain API Keys (Kraken, CryptoCompare, Gemini, Telegram Bot Token, Existing AI API). Store securely (e.g., Firebase environment variables or Secret Manager).
         - [ ] Set up Firebase project (Firestore database, Cloud Functions).
-        - [ ] Install dependencies (`pip install -r requirements.txt`). Ensure TA-Lib C library is handled for local dev and Cloud Functions deployment.
+        - [ ] Install dependencies (`pip install -r requirements.txt`). Ensure `pandas-ta` is the primary TA library.
     2.  **Configuration Management:**
         - [ ] Implement a way to manage tracked coins (e.g., Firestore collection or config file).
         - [ ] Store API keys and sensitive data securely.
     3.  **Data Fetching Module:**
-        - [ ] Implement `fetch_bybit_kline` using Bybit REST API V5 (`category=linear`, `interval=5`).
+        - [ ] Implement `fetch_kraken_kline` using Kraken REST API.
         - [ ] (Optional) Implement WebSocket connection for real-time data (`wss://stream.bybit.com/v5/public/linear`).
         - [ ] Implement `fetch_cryptocompare_kline` as a backup.
         - [ ] Add error handling for API requests (timeouts, rate limits, invalid responses).
     4.  **Technical Analysis Module:**
-        - [ ] Implement `detect_patterns` using TA-Lib (Hammer, Shooting Star, Engulfing). Handle pattern confirmation logic (next candle).
-        - [ ] Implement `calculate_indicators` using TA-Lib (RSI, SMA).
+        - [ ] Implement `detect_patterns` using `pandas-ta` (Hammer, Shooting Star, Engulfing). Handle pattern confirmation logic (next candle).
+        - [ ] Implement `calculate_indicators` using `pandas-ta` (RSI, SMA).
         - [ ] Calculate average volume.
         - [ ] Ensure data is pre-processed correctly for TA-Lib (numpy arrays).
     5.  **Confidence Scoring Module:**
@@ -88,7 +88,7 @@
         - [ ] Define the main scheduled Cloud Function (`analyze_candles`) using `firebase_functions.scheduler_fn`.
         - [ ] Set the correct cron schedule string for market hours.
         - [ ] Loop through tracked coins.
-        - [ ] Call `fetch_bybit_kline`, `generate_signal`.
+        - [ ] Call `fetch_kraken_kline`, `generate_signal`.
         - [ ] If a signal is generated:
             - Call `send_telegram_signal`.
             - Log the signal in Firestore (`signals` collection).
@@ -105,7 +105,7 @@
         - [ ] Monitor logs and quotas in Firebase Console.
 
     ## Notes & Considerations
-    - **TA-Lib Installation:** Requires C library. Ensure setup works locally and on Cloud Functions (using `libta-lib-dev` in `requirements.txt`).
+    - **`pandas-ta` Usage:** `pandas-ta` is used for technical analysis, simplifying dependencies compared to TA-Lib.
     - **Rate Limits:** Monitor Bybit API usage. WebSocket is preferred for frequent polling but adds complexity. REST polling every 5 minutes should be acceptable for ~10 coins.
     - **Error Handling:** Implement retries, exponential backoff for API calls. Log errors clearly.
     - **Timezones:** Be explicit with timezones, especially for market hours and Firestore timestamps (use UTC).
