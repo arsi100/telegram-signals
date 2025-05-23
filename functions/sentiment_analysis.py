@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LunarCrushAPI:
     """LunarCrush API integration for sentiment analysis."""
     
-    BASE_URL = "https://api.lunarcrush.com/v3"
+    BASE_URL = "https://lunarcrush.com/api4/public" # Confirmed working base
     
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -33,56 +33,57 @@ class LunarCrushAPI:
             Dict containing sentiment metrics or None if request fails
         """
         try:
-            url = f"{self.BASE_URL}/coins/{symbol}"
-            params = {
-                'data_points': 1,  # We only need the latest data point
-                'interval': '1h',  # 1-hour interval for latest data
-                'key': self.api_key
-            }
+            url = f"{self.BASE_URL}/coins/{symbol}/v1" # Confirmed working path
+            params = {'key': self.api_key} 
             
             response = self.session.get(url, params=params)
             response.raise_for_status()
             
-            data = response.json()
-            if not data.get('data'):
-                logger.warning(f"No data returned for {symbol}")
+            response_data = response.json()
+            
+            if not response_data or 'data' not in response_data or not isinstance(response_data['data'], dict):
+                logger.warning(f"No 'data' object or unexpected structure in response from {url} for {symbol}")
                 return None
-                
-            coin_data = data['data'][0]
             
-            # Extract relevant metrics
+            coin_data = response_data['data'] # This is now the object with metrics
+            
+            # Extract available metrics, provide defaults and warnings for missing ones
             metrics = {
-                'average_sentiment_score': coin_data.get('average_sentiment_score', 3.0),
-                'social_impact_score': coin_data.get('social_impact_score', 3.0),
-                'galaxy_score': coin_data.get('galaxy_score', 50.0),
-                'social_volume': coin_data.get('social_volume', 0.0),
-                'social_volume_change_24h': coin_data.get('social_volume_change_24h', 0.0),
-                'timestamp': coin_data.get('timestamp', int(time.time()))
+                'galaxy_score': coin_data.get('galaxy_score'),
+                'alt_rank': coin_data.get('alt_rank'),
+                'price': coin_data.get('price'),
+                'volume_24h': coin_data.get('volume_24h'), # Trading volume
+                'percent_change_24h': coin_data.get('percent_change_24h'),
+                # Fields from old v3 that are MISSING in this v4 /v1 endpoint:
+                'average_sentiment_score': 3.0, # Default, MISSING
+                'social_impact_score': 3.0,   # Default, MISSING
+                'social_volume': 0.0,           # Default, MISSING
+                'social_volume_change_24h': 0.0,# Default, MISSING
+                'timestamp': response_data.get('config', {}).get('generated', int(time.time())) # Use 'generated' from config as timestamp
             }
+
+            if metrics['galaxy_score'] is None: logger.warning(f"galaxy_score missing for {symbol} in v4 response")
+            if coin_data.get('average_sentiment_score') is None: logger.warning(f"average_sentiment_score IS MISSING for {symbol} in v4 response. Using default.")
+            if coin_data.get('social_impact_score') is None: logger.warning(f"social_impact_score IS MISSING for {symbol} in v4 response. Using default.")
+            if coin_data.get('social_volume') is None: logger.warning(f"social_volume IS MISSING for {symbol} in v4 response. Using default.")
             
-            logger.info(f"LunarCrush metrics for {symbol}: ASS={metrics['average_sentiment_score']:.2f}, "
-                       f"SIS={metrics['social_impact_score']:.2f}, Galaxy={metrics['galaxy_score']:.2f}")
-            
+            logger.info(f"LunarCrush v4 metrics from {url} for {symbol}: GalaxyScore={metrics['galaxy_score']}, AltRank={metrics['alt_rank']}")
             return metrics
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching LunarCrush data for {symbol}: {e}")
+            logger.error(f"Error fetching LunarCrush data for {symbol} from {url}: {e}")
+            if e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response text: {e.response.text}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error in LunarCrush API call for {symbol}: {e}")
+            logger.error(f"Unexpected error in LunarCrush API call for {symbol} to {url}: {e}")
             return None
 
 def get_sentiment_score(symbol: str) -> Tuple[float, Dict]:
     """
     Get sentiment score and metrics for a trading symbol.
-    
-    Args:
-        symbol: The trading symbol (e.g., 'PF_XBTUSD')
-        
-    Returns:
-        Tuple of (sentiment_score, metrics_dict)
-        sentiment_score: Float between -1 and 1 (-1 = bearish, 1 = bullish)
-        metrics_dict: Dictionary containing raw metrics
+    Adapting to LunarCrush API v4 which may not directly provide 'average_sentiment_score'.
     """
     if not config.SENTIMENT_ANALYSIS_ENABLED:
         return 0.0, {}
@@ -94,27 +95,50 @@ def get_sentiment_score(symbol: str) -> Tuple[float, Dict]:
             logger.warning(f"No LunarCrush symbol mapping for {symbol}")
             return 0.0, {}
             
-        # Initialize API client
+        # Initialize API client (will use the updated BASE_URL)
         api = LunarCrushAPI(config.LUNARCRUSH_API_KEY)
         
-        # Get metrics
+        # Get metrics (raw JSON from api4/.../v1 if successful)
         metrics = api.get_coin_metrics(lunarcrush_symbol)
+        
         if not metrics:
             return 0.0, {}
             
-        # Calculate sentiment score based on ASS
-        ass = metrics['average_sentiment_score']
-        if ass >= config.SENTIMENT_THRESHOLD_BULLISH:
-            sentiment_score = 1.0  # Very bullish
-        elif ass <= config.SENTIMENT_THRESHOLD_BEARISH:
-            sentiment_score = -1.0  # Very bearish
+        # --- Sentiment Calculation Adjustment for v4 ---
+        # 'average_sentiment_score' is missing from the current v4 endpoint.
+        # We will use 'galaxy_score' as a proxy for now. Galaxy Score is 0-100.
+        # Let's normalize Galaxy Score to a -1 to 1 range.
+        # Assuming 50 is neutral, <50 bearish, >50 bullish.
+        # (This is a guess and might need refinement based on Galaxy Score behavior)
+        
+        galaxy_score = metrics.get('galaxy_score')
+        sentiment_score = 0.0 # Default to neutral
+
+        if galaxy_score is not None:
+            # Normalize galaxy_score (0-100) to sentiment_score (-1 to 1)
+            # Treat 0-40 as bearish (-1 to -0.2), 40-60 as neutral (-0.2 to 0.2), 60-100 as bullish (0.2 to 1)
+            if galaxy_score < 40:
+                sentiment_score = -1.0 + ((galaxy_score / 40.0) * 0.8) # Scales 0-39 to -1.0 to -0.2
+            elif galaxy_score > 60:
+                sentiment_score = 0.2 + (((galaxy_score - 60) / 40.0) * 0.8) # Scales 61-100 to 0.2 to 1.0
+            else: # Between 40 and 60 (inclusive)
+                sentiment_score = -0.2 + (((galaxy_score - 40) / 20.0) * 0.4) # Scales 40-60 to -0.2 to 0.2
+            sentiment_score = round(max(-1.0, min(1.0, sentiment_score)), 4) # Ensure it's clamped and rounded
+            logger.info(f"Using Galaxy Score {galaxy_score} to derive sentiment_score: {sentiment_score} for {lunarcrush_symbol}")
         else:
-            # Linear interpolation between thresholds
-            sentiment_score = (ass - 3.0) / (config.SENTIMENT_THRESHOLD_BULLISH - 3.0)
-            
-        # Add social volume bonus
-        if metrics['social_volume_change_24h'] > config.SOCIAL_VOLUME_MULTIPLIER:
-            sentiment_score *= 1.1  # 10% boost for high social volume
+            logger.warning(f"Galaxy Score is None for {lunarcrush_symbol}. Defaulting sentiment to neutral (0.0).")
+            # Fallback to old ASS if by some miracle it was populated (it won't be with current parsing)
+            # ass = metrics['average_sentiment_score'] # This will be the default 3.0
+            # if ass >= config.SENTIMENT_THRESHOLD_BULLISH: sentiment_score = 1.0
+            # elif ass <= config.SENTIMENT_THRESHOLD_BEARISH: sentiment_score = -1.0
+            # else: sentiment_score = (ass - 3.0) / (config.SENTIMENT_THRESHOLD_BULLISH - 3.0)
+
+        # 'social_volume_change_24h' is missing. Social volume bonus cannot be applied.
+        if metrics.get('social_volume_change_24h', 0) == 0 and metrics.get('social_volume', 0) == 0:
+             logger.info(f"Social volume data missing for {lunarcrush_symbol}, skipping social volume bonus.")
+        # else:
+        #    if metrics['social_volume_change_24h'] > config.SOCIAL_VOLUME_MULTIPLIER:
+        #        sentiment_score *= 1.1 
             
         return sentiment_score, metrics
         
