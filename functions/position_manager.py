@@ -4,8 +4,7 @@ import datetime
 import pytz
 from . import config # Import config for cooldown period
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Get logger (logging configuration handled by main.py)
 logger = logging.getLogger(__name__)
 
 # Firestore Collection Names

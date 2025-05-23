@@ -4,8 +4,7 @@ from flask import Flask, render_template, jsonify
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Get logger (basic logging for Flask interface)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app

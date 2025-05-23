@@ -1,9 +1,9 @@
-import logging
 import requests
+import logging
 import os
+from datetime import datetime, timedelta
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Get logger (logging configuration handled by main.py)
 logger = logging.getLogger(__name__)
 
 def fetch_cryptocompare_kline(symbol, tsym="USDT", interval=5, limit=1000):

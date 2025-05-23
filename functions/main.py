@@ -1,4 +1,5 @@
 # main.py
+# Last modified: 2025-05-23 - Fixed logging duplication issue
 # Last modified: 2025-05-21 - Force rebuild for Telegram secret refresh
 # Last modified: 2025-05-21 - Force rebuild
 import functions_framework
@@ -24,14 +25,29 @@ logging.getLogger("telegram.ext.ExtBot").setLevel(logging.WARNING)
 logging.getLogger("telegram.bot").setLevel(logging.WARNING)
 # --- End python-telegram-bot logging ---
 
-# Configure logging using config setting instead of hardcoded DEBUG
-log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+# --- FIXED LOGGING CONFIGURATION for Google Cloud Functions ---
+# Clear any existing handlers to prevent duplication
+root_logger = logging.getLogger()
+root_logger.handlers.clear()
+
 # Import config first to get LOG_LEVEL
 from . import config
 log_level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
-logging.basicConfig(level=log_level, format=log_format, force=True)
+
+# Create a single StreamHandler that writes to stdout only
+# Google Cloud Functions will capture stdout properly without duplication
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
+handler.setFormatter(formatter)
+
+# Configure root logger with single handler
+root_logger.addHandler(handler)
+root_logger.setLevel(log_level)
+
+# Get logger for this module
 logger = logging.getLogger(__name__)
 logger.setLevel(log_level)
+# --- END FIXED LOGGING CONFIGURATION ---
 
 # Global flags and db client
 IMPORTS_SUCCESSFUL = False

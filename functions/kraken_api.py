@@ -100,6 +100,7 @@ def fetch_kline_data(symbol: str):
 
 # Example usage (for testing):
 if __name__ == '__main__':
+    # Only configure logging when running as standalone script
     logging.basicConfig(level=logging.INFO)
     # Using a known Kraken Futures symbol format
     test_symbol = 'PF_XBTUSD' 

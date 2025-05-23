@@ -202,12 +202,16 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
         # Load only the specific candlestick patterns we need instead of all patterns
         # This avoids TA-Lib warnings for patterns we don't use
         try:
-            # Only load the 6 patterns we actually need
-            df.ta.cdl_hammer(append=True)
-            df.ta.cdl_shootingstar(append=True) 
-            df.ta.cdl_engulfing(append=True)
-            df.ta.cdl_morningstar(append=True)
-            df.ta.cdl_eveningstar(append=True)
+            # Use correct pandas-ta syntax for candlestick patterns
+            # pandas-ta uses the cdl_pattern function with name parameter
+            import pandas_ta as ta
+            
+            # Create the pattern columns using pandas-ta cdl_pattern function
+            df['CDL_HAMMER'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="hammer")
+            df['CDL_SHOOTINGSTAR'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="shootingstar") 
+            df['CDL_ENGULFING'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="engulfing")
+            df['CDL_MORNINGSTAR'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="morningstar")
+            df['CDL_EVENINGSTAR'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="eveningstar")
         except Exception as e:
             logger.warning(f"Error loading specific candlestick patterns: {e}")
             # Fallback: create empty columns if pattern loading fails
