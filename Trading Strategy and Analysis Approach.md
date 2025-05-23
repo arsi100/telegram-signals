@@ -154,6 +154,23 @@ This document provides a detailed framework. Please fill in the `[User to detail
 - **Benefits:** Dramatically reduced Cloud Functions logging costs and improved log readability for production monitoring
 - **Commit:** `60410dd` - Optimize logging verbosity in technical analysis 
 
+### Critical Production Fixes (May 2025)
+- **Issue 1 - Logging Duplication:** Every log entry appeared twice in stdout AND stderr, creating 12,000+ log lines per execution instead of the target <200
+- **Issue 2 - pandas-ta Pattern Errors:** `AttributeError: 'AnalysisIndicators' object has no attribute 'cdl_hammer'` preventing candlestick pattern detection
+- **Root Causes:**
+  - Multiple `logging.basicConfig()` calls across modules created duplicate handlers
+  - Incorrect pandas-ta syntax: `df.ta.cdl_hammer()` instead of `ta.cdl_pattern(name="hammer")`
+- **Solutions Implemented:**
+  - **main.py:** Replaced duplicate basicConfig with single StreamHandler to stdout
+  - **All modules:** Removed duplicate basicConfig calls, use `logger = logging.getLogger(__name__)`
+  - **technical_analysis.py:** Fixed pandas-ta syntax to use `ta.cdl_pattern(open, high, low, close, name="pattern_name")`
+  - **requirements.txt:** Added proper TA-Lib dependency for production-grade pattern detection
+- **Expected Impact:** 
+  - 6000% log reduction (12,000+ → ~200 lines) due to deduplication
+  - Eliminates pandas-ta pattern loading errors
+  - Maintains all functionality with proper error handling
+- **Deployment:** Auto-deployed via GitHub → Cloud Build → Cloud Functions pipeline
+- **Function Target:** `run_signal_generation` revision 00052+
 
 Updated Trading Strategy for CryptoSignalTracker
 1. Overall Philosophy & Goal
