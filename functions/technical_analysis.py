@@ -111,6 +111,30 @@ def calculate_rsi(df: pd.DataFrame, return_all=False):
         logger.error(f"Error calculating RSI: {e}", exc_info=True)
         return np.array([]) if return_all else 50.0
 
+def calculate_ema(df: pd.DataFrame, return_all=False):
+    """Calculate Exponential Moving Average (EMA) using pandas-ta."""
+    try:
+        if df.empty or len(df) < config.EMA_PERIOD:
+            logger.warning(f"Not enough data points ({len(df)}) to calculate EMA with period {config.EMA_PERIOD}")
+            return np.array([]) if return_all else (df['close'].iloc[-1] if not df.empty else None)
+            
+        ema_series = df.ta.ema(length=config.EMA_PERIOD)
+
+        if ema_series is None or ema_series.empty:
+            logger.warning("EMA calculation returned None or empty series.")
+            return np.array([]) if return_all else (df['close'].iloc[-1] if not df.empty else None)
+
+        if return_all:
+            return ema_series.to_numpy()
+        else:
+            latest_ema = ema_series.iloc[-1] if not pd.isna(ema_series.iloc[-1]) else (df['close'].iloc[-1] if not df.empty else None)
+            return latest_ema
+        
+    except Exception as e:
+        logger.error(f"Error calculating EMA: {e}", exc_info=True)
+        last_close = df['close'].iloc[-1] if not df.empty and 'close' in df.columns else None
+        return np.array([]) if return_all else last_close
+
 def calculate_sma(df: pd.DataFrame, return_all=False):
     """Calculate Simple Moving Average (SMA) using pandas-ta."""
     try:
@@ -457,6 +481,55 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
         else:
             return default_result_latest
 
+def calculate_atr(df: pd.DataFrame, return_all=False):
+    """Calculate Average True Range (ATR) using pandas-ta for volatility filtering."""
+    try:
+        if df.empty or len(df) < config.ATR_PERIOD:
+            logger.warning(f"Not enough data points ({len(df)}) to calculate ATR with period {config.ATR_PERIOD}")
+            return np.array([]) if return_all else 0.0
+            
+        atr_series = df.ta.atr(length=config.ATR_PERIOD)
+
+        if atr_series is None or atr_series.empty:
+            logger.warning("ATR calculation returned None or empty series.")
+            return np.array([]) if return_all else 0.0
+
+        if return_all:
+            return atr_series.to_numpy()
+        else:
+            latest_atr = atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 0.0
+            return latest_atr
+        
+    except Exception as e:
+        logger.error(f"Error calculating ATR: {e}", exc_info=True)
+        return np.array([]) if return_all else 0.0
+
+def check_atr_filter(df: pd.DataFrame):
+    """Check if current ATR is above 1.5x 20-period average for volatility filtering."""
+    try:
+        if df.empty or len(df) < config.ATR_PERIOD + 20:
+            return False
+            
+        atr_series = df.ta.atr(length=config.ATR_PERIOD)
+        if atr_series is None or atr_series.empty:
+            return False
+            
+        # Calculate 20-period average of ATR
+        atr_avg_series = atr_series.rolling(window=20).mean()
+        
+        current_atr = atr_series.iloc[-1]
+        avg_atr = atr_avg_series.iloc[-1]
+        
+        if pd.isna(current_atr) or pd.isna(avg_atr) or avg_atr == 0:
+            return False
+            
+        atr_ratio = current_atr / avg_atr
+        return atr_ratio > config.ATR_MULTIPLIER
+        
+    except Exception as e:
+        logger.error(f"Error checking ATR filter: {e}", exc_info=True)
+        return False
+
 def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
     """Main function to perform technical analysis using pandas-ta."""
     if not kline_data_list:
@@ -466,15 +539,17 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
     try:
         df = _ensure_dataframe(kline_data_list) # Initial and only call to _ensure_dataframe
         
-        min_len_for_analysis = max(config.RSI_PERIOD, config.SMA_PERIOD, 20) + 5 # Similar to detect_patterns min_len
+        min_len_for_analysis = max(config.RSI_PERIOD, config.EMA_PERIOD, config.ATR_PERIOD, 20) + 5 # Updated to use EMA_PERIOD and include ATR_PERIOD
         if df.empty or len(df) < min_len_for_analysis:
             logger.warning(f"Insufficient data after processing in DataFrame ({len(df)} points) for full analysis. Need at least {min_len_for_analysis}.")
             return None
         logger.info(f"DataFrame for technical analysis has {len(df)} rows after initial processing.")
 
         rsi_latest = calculate_rsi(df) 
-        sma_latest = calculate_sma(df)
-        sma_series_all = calculate_sma(df, return_all=True) 
+        ema_latest = calculate_ema(df)
+        ema_series_all = calculate_ema(df, return_all=True)  # Changed from sma_series_all to ema_series_all
+        atr_latest = calculate_atr(df)
+        atr_filter_passed = check_atr_filter(df)
         volume_analysis_latest = analyze_volume(df)
         volume_analysis_all = analyze_volume(df, return_all=True)
 
@@ -487,38 +562,40 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
         else:
             logger.info("DataFrame for pattern detection is empty.")
 
-        pattern_result = detect_candlestick_patterns(df, sma_series_all, volume_analysis_all)
+        pattern_result = detect_candlestick_patterns(df, ema_series_all, volume_analysis_all)  # Changed to use ema_series_all
 
         current_price = df['close'].iloc[-1] if not df.empty else None
 
-        sma_cross_bullish = False
-        sma_cross_bearish = False
-        if isinstance(sma_series_all, np.ndarray) and len(sma_series_all) >= 2 and len(df['close']) >=2:
+        ema_cross_bullish = False
+        ema_cross_bearish = False
+        if isinstance(ema_series_all, np.ndarray) and len(ema_series_all) >= 2 and len(df['close']) >=2:
             prev_close_val = df['close'].iloc[-2]
             curr_close_val = df['close'].iloc[-1]
-            prev_sma_val = sma_series_all[-2]
-            curr_sma_val = sma_series_all[-1]
+            prev_ema_val = ema_series_all[-2]
+            curr_ema_val = ema_series_all[-1]
 
-            if not (pd.isna(prev_close_val) or pd.isna(curr_close_val) or pd.isna(prev_sma_val) or pd.isna(curr_sma_val)):
-                if prev_close_val < prev_sma_val and curr_close_val > curr_sma_val: sma_cross_bullish = True
-                elif prev_close_val > prev_sma_val and curr_close_val < curr_sma_val: sma_cross_bearish = True
+            if not (pd.isna(prev_close_val) or pd.isna(curr_close_val) or pd.isna(prev_ema_val) or pd.isna(curr_ema_val)):
+                if prev_close_val < prev_ema_val and curr_close_val > curr_ema_val: ema_cross_bullish = True
+                elif prev_close_val > prev_ema_val and curr_close_val < curr_ema_val: ema_cross_bearish = True
         
         technicals = {
             'rsi': rsi_latest,
-            'sma': sma_latest, 
+            'ema': ema_latest,  # Changed from 'sma' to 'ema'
+            'atr': atr_latest,
+            'atr_filter_passed': atr_filter_passed,
             'latest_close': current_price,
             'volume_increase': volume_analysis_latest.get('high_volume', False),
             'pattern_detected': pattern_result.get("pattern_detected_raw", False), 
             'pattern_bullish': pattern_result.get("pattern_type") == "bullish",
             'pattern_bearish': pattern_result.get("pattern_type") == "bearish",
             'pattern_name': pattern_result.get("pattern_name", "N/A"),
-            'sma_cross_bullish': sma_cross_bullish,
-            'sma_cross_bearish': sma_cross_bearish,
+            'ema_cross_bullish': ema_cross_bullish,  # Changed from 'sma_cross_bullish'
+            'ema_cross_bearish': ema_cross_bearish,  # Changed from 'sma_cross_bearish'
             'raw_volume_analysis': volume_analysis_latest,
             'raw_patterns_result': pattern_result 
         }
         
-        logger.info(f"Generated technicals for {df['timestamp'].iloc[-1] if 'timestamp' in df.columns and not df.empty else 'N/A'}: {technicals}")
+        logger.info(f"Generated technicals for {df['timestamp'].iloc[-1] if 'timestamp' in df.columns and not df.empty else 'N/A'}: RSI={rsi_latest:.1f}, EMA={ema_latest:.2f}, ATR={atr_latest:.4f}, ATR_filter={atr_filter_passed}, patterns={pattern_result.get('pattern_name', 'N/A')}")
         return technicals
 
     except ValueError as ve: 

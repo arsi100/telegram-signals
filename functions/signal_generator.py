@@ -5,7 +5,7 @@ import pytz
 # Use relative imports
 from .technical_analysis import analyze_technicals
 from .confidence_calculator import get_confidence_score
-from .position_manager import get_open_position, is_in_cooldown_period
+from .position_manager import get_open_position, is_in_cooldown_period, record_signal_ts
 from .utils import is_market_hours # Assuming utils.py exists and is needed
 from . import config
 
@@ -16,7 +16,7 @@ def calculate_local_confidence(tech_results):
     """
     Calculates a basic, weighted confidence score based on technical indicators.
     This can serve as a fallback or input to a more advanced scorer (e.g., Gemini).
-    Weights: Pattern=40, RSI=30, Volume=20, SMA=10
+    Weights: Pattern=40, RSI=30, Volume=20, EMA=10
     """
     score = 0
     components = {}
@@ -24,7 +24,7 @@ def calculate_local_confidence(tech_results):
     patterns = tech_results['raw_patterns_result']
     rsi = tech_results['rsi']
     volume_high = tech_results['volume_increase']
-    sma = tech_results['sma']
+    ema = tech_results['ema']  # Changed from sma to ema
     price = tech_results['latest_close']
 
     # Pattern Score (Max 40)
@@ -55,16 +55,16 @@ def calculate_local_confidence(tech_results):
     else:
         components['volume'] = 0
 
-    # SMA Score (Max 10)
+    # EMA Score (Max 10) - Changed from SMA
     # Check for trend alignment with pattern
-    if is_bullish_pattern and price < sma:
+    if is_bullish_pattern and price < ema:
         score += 10
-        components['sma'] = 10
-    elif is_bearish_pattern and price > sma:
+        components['ema'] = 10
+    elif is_bearish_pattern and price > ema:
         score += 10
-        components['sma'] = 10
+        components['ema'] = 10
     else:
-        components['sma'] = 0
+        components['ema'] = 0
 
     logger.debug(f"Local score components: {components}")
     return min(score, 100) # Cap score at 100
@@ -97,10 +97,11 @@ def process_crypto_data(symbol, kline_data, db):
         price = tech_results['latest_close']
         patterns = tech_results['raw_patterns_result']
         rsi = tech_results['rsi']
-        sma = tech_results['sma']
+        ema = tech_results['ema']
         is_high_volume = tech_results['volume_increase']
+        atr_filter_passed = tech_results.get('atr_filter_passed', False)  # Add ATR filter check
 
-        logger.info(f"{symbol} TA Results - Price: {price:.2f}, RSI: {rsi:.2f}, SMA: {sma:.2f}, HighVol: {is_high_volume}, Patterns: {patterns}")
+        logger.info(f"{symbol} TA Results - Price: {price:.2f}, RSI: {rsi:.2f}, EMA: {ema:.2f}, HighVol: {is_high_volume}, ATR_filter: {atr_filter_passed}, Patterns: {patterns}")
 
         # 3. Check Position Status
         current_position = get_open_position(symbol, db)
@@ -209,14 +210,14 @@ def process_crypto_data(symbol, kline_data, db):
             final_signal_type = None # Will be LONG or SHORT
             
             if signal_intent == "LONG":
-                # Check all strict conditions for LONG entry
-                if rsi < config.RSI_OVERSOLD_THRESHOLD and is_high_volume and (price < sma):
+                # Check all strict conditions for LONG entry including ATR filter
+                if rsi < config.RSI_OVERSOLD_THRESHOLD and is_high_volume and (price < ema) and atr_filter_passed:
                     logger.info(f"Potential LONG entry conditions met for {symbol}.")
                     entry_signal_conditions_met = True
                     final_signal_type = "LONG"
             elif signal_intent == "SHORT":
-                 # Check all strict conditions for SHORT entry
-                 if rsi > config.RSI_OVERBOUGHT_THRESHOLD and is_high_volume and (price > sma):
+                 # Check all strict conditions for SHORT entry including ATR filter
+                 if rsi > config.RSI_OVERBOUGHT_THRESHOLD and is_high_volume and (price > ema) and atr_filter_passed:
                      logger.info(f"Potential SHORT entry conditions met for {symbol}.")
                      entry_signal_conditions_met = True
                      final_signal_type = "SHORT"
@@ -247,7 +248,7 @@ def process_crypto_data(symbol, kline_data, db):
                           "confidence": final_confidence,
                           # Include context for notification/saving?
                           "rsi": rsi,
-                          "sma": sma,
+                          "ema": ema,
                           "volume_ratio": tech_results['raw_volume_analysis'].get('volume_ratio', 1.0)
                           # TODO: Add long-term trend from external AI?
                      }

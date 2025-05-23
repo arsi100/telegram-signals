@@ -57,24 +57,28 @@ MARKET_HOURS = {
 # Cooldown period in minutes
 SIGNAL_COOLDOWN_MINUTES = 15
 
-# Technical analysis parameters
-RSI_PERIOD = 14
-SMA_PERIOD = 50
-VOLUME_PERIOD = 20
+# Technical analysis parameters - Updated for Phase 1 optimization
+RSI_PERIOD = 7  # Changed from 14 to 7 for more responsive 5-minute charts
+EMA_PERIOD = 20  # Changed from SMA_PERIOD = 50 to EMA_PERIOD = 20 for faster trend detection
+VOLUME_PERIOD = 20  # Keep 20-period for volume analysis
 
 # RSI Thresholds - Phase 1 optimization
-RSI_OVERSOLD_THRESHOLD = 35
-RSI_OVERBOUGHT_THRESHOLD = 65
+RSI_OVERSOLD_THRESHOLD = 35  # Changed from 30 to 35 for long signals
+RSI_OVERBOUGHT_THRESHOLD = 65  # Changed from 70 to 65 for short signals
 
-# Volume Analysis
-VOLUME_MULTIPLIER = 1.5
+# Volume Analysis - Phase 1 optimization
+VOLUME_MULTIPLIER = 1.5  # Volume must be >1.5x 20-period average
 
 # Logging Configuration
 LOG_LEVEL = "INFO" # Default logging level (e.g., DEBUG, INFO, WARNING, ERROR)
 
-# Signal Generation Parameters
-CONFIDENCE_THRESHOLD = 70
+# Signal Generation Parameters - Temporarily lowered for testing
+CONFIDENCE_THRESHOLD = 70  # Temporarily lowered from 80 to 70 for Phase 1 testing
+
+# ATR Parameters - New addition for volatility filtering
+ATR_PERIOD = 20
+ATR_MULTIPLIER = 1.5  # ATR must be >1.5x 20-period average
 
 # New additions
-KLINE_INTERVAL = "15m"  # Default interval for kline data
-KLINE_LIMIT = 100         # Default limit for kline data
+KLINE_INTERVAL = "5m"  # Changed from 15m to 5m for primary analysis
+KLINE_LIMIT = 2000     # Increased from 100 to 2000 for more historical data
