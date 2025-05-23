@@ -132,11 +132,12 @@ def send_telegram_message(signal: dict, parse_mode="MarkdownV2"):
         response_data = response.json()
         if response_data.get("ok"):
             logger.info(f"Message successfully sent to Telegram chat ID {chat_id}.")
-        return True
         else:
             error_desc = response_data.get('description', 'Unknown error')
             logger.error(f"Telegram API error response: {error_desc} (Payload text: {message_to_send[:100]}...)") # Log partial payload
             return False
+        
+        return True
 
     except requests.exceptions.RequestException as e:
         logger.error(f"HTTP Error sending Telegram message: {e}")
