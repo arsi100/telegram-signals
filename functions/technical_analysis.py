@@ -219,21 +219,21 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
             "bearish_engulfing": (engulfing == -100),
         }
 
-        # Log raw_detections
-        logger.info("Raw pattern detections by pandas-ta (last 15 rows):")
+        # Log raw_detections - REDUCED VERBOSITY
+        logger.info("Raw pattern detections summary:")
         for pattern_key, series in raw_detections.items():
             if hasattr(series, 'empty') and not series.empty: # Check if it's a Series and not empty
                 try:
-                    # Attempt to get symbol if df is available and has symbol, otherwise generic log
+                    # Just show if any pattern was detected, not all 15 rows
+                    any_detected = series.any()
+                    recent_count = series.tail(15).sum() if hasattr(series, 'sum') else 0
                     symbol_info = df['symbol'].iloc[-1] if 'symbol' in df.columns and not df.empty else "current_symbol"
-                    logger.info(f"  {pattern_key} for {symbol_info}:\n{series.tail(15).to_string()}")
+                    logger.info(f"  {pattern_key} for {symbol_info}: Any detected: {any_detected}, Recent (last 15): {recent_count}")
                 except Exception as e:
-                    logger.info(f"  {pattern_key} (error getting symbol or tail): {series}") # Fallback logging
+                    logger.info(f"  {pattern_key} (error getting summary): {series}") # Fallback logging
             elif isinstance(series, pd.Series) and series.empty:
                  logger.info(f"  {pattern_key}: Empty pandas Series")
             else:
-                # This case might occur if a raw_detection entry is not a Series (e.g. a bool if df was too short)
-                # For consistency, let's ensure raw_detections always holds Series, even if all False
                 logger.info(f"  {pattern_key}: Not a non-empty Series (type: {type(series)}, value: {series})")
 
         confirmed_patterns_all = {key: np.array([False] * len(df)) for key in pattern_details}
@@ -452,9 +452,12 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
         volume_analysis_latest = analyze_volume(df)
         volume_analysis_all = analyze_volume(df, return_all=True)
 
-        # Log the tail of the DataFrame for manual inspection
+        # Log DataFrame summary instead of full rows
         if not df.empty:
-            logger.info(f"DataFrame for pattern detection (last 15 rows for symbol {df['symbol'].iloc[-1] if 'symbol' in df.columns else 'N/A'}):\n{df.tail(15).to_string()}")
+            symbol_name = df['symbol'].iloc[-1] if 'symbol' in df.columns else 'N/A'
+            latest_timestamp = df['timestamp'].iloc[-1] if 'timestamp' in df.columns else 'N/A'
+            latest_close = df['close'].iloc[-1] if 'close' in df.columns else 'N/A'
+            logger.info(f"DataFrame for pattern detection: {len(df)} rows, symbol: {symbol_name}, latest: {latest_timestamp} @ {latest_close}")
         else:
             logger.info("DataFrame for pattern detection is empty.")
 
