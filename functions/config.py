@@ -123,7 +123,7 @@ SHOOTING_STAR_LOWER_WICK_MAX_RATIO = 0.3
 ENGULFING_BODY_FACTOR = 1.5
 
 # Sentiment Analysis Configuration - ENABLED with LunarCrush
-SENTIMENT_ANALYSIS_ENABLED = True
+SENTIMENT_ANALYSIS_ENABLED = True  # Reverted back to True
 SENTIMENT_WEIGHT = 0.1  # 10% of confidence score
 SENTIMENT_SOURCES = ['lunarcrush']  # Using LunarCrush as primary source
 SENTIMENT_LOOKBACK_HOURS = 24
