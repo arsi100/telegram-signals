@@ -25,8 +25,8 @@ def get_open_position(symbol: str, db):
     """
     try:
         query = db.collection(POSITIONS_COLLECTION)\
-                  .where("symbol", "==", symbol)\
-                  .where("status", "==", "open")\
+                  .where(field_path="symbol", op_string="==", value=symbol)\
+                  .where(field_path="status", op_string="==", value="open")\
                   .limit(1)\
                   .stream() # Use stream for potentially single result
         
