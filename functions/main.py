@@ -40,60 +40,31 @@ db = None
 
 # Import and initialize Firebase at the top level
 try:
-    print("***** MAIN.PY TOP LEVEL: START OF TRY BLOCK *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'import firebase_admin'... *****")
     import firebase_admin
-    print("***** MAIN.PY TOP LEVEL: 'import firebase_admin' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from firebase_admin import credentials, firestore'... *****")
     from firebase_admin import credentials, firestore
-    print("***** MAIN.PY TOP LEVEL: 'from firebase_admin import credentials, firestore' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from . import config'... *****")
     from . import config
-    print("***** MAIN.PY TOP LEVEL: 'from . import config' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from .kraken_api import fetch_kline_data'... *****")
     from .kraken_api import fetch_kline_data
-    print("***** MAIN.PY TOP LEVEL: 'from .kraken_api import fetch_kline_data' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from .technical_analysis import analyze_technicals'... *****")
     from .technical_analysis import analyze_technicals
-    print("***** MAIN.PY TOP LEVEL: 'from .technical_analysis import analyze_technicals' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from .position_manager import ...'... *****")
     from .position_manager import get_open_position, save_position, update_position, close_position, record_signal_ts
-    print("***** MAIN.PY TOP LEVEL: 'from .position_manager import ...' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from .telegram_bot import send_telegram_message'... *****")
     from .telegram_bot import send_telegram_message
-    print("***** MAIN.PY TOP LEVEL: 'from .telegram_bot import send_telegram_message' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from .confidence_calculator import get_confidence_score'... *****")
     from .confidence_calculator import get_confidence_score
-    print("***** MAIN.PY TOP LEVEL: 'from .confidence_calculator import get_confidence_score' - COMMENTED OUT / HANDLED BY SIGNAL_GENERATOR *****")
-    print("***** MAIN.PY TOP LEVEL: Attempting 'from .signal_generator import process_crypto_data'... *****")
     from .signal_generator import process_crypto_data
-    print("***** MAIN.PY TOP LEVEL: 'from .signal_generator import process_crypto_data' - SUCCESS *****")
-    print("***** MAIN.PY TOP LEVEL: Application imports successful *****")
     IMPORTS_SUCCESSFUL = True
 
     if not firebase_admin._apps:
-        print("***** MAIN.PY TOP LEVEL: Firebase not initialized. Attempting firebase_admin.initialize_app()... *****")
         firebase_admin.initialize_app() # Use Application Default Credentials
         db = firestore.client()
-        print("***** MAIN.PY TOP LEVEL: firebase_admin.initialize_app() - SUCCESS. DB client obtained. *****")
         FIREBASE_INITIALIZED = True
     else:
-        print("***** MAIN.PY TOP LEVEL: Firebase already initialized. Attempting firestore.client()... *****")
         db = firestore.client()
-        print("***** MAIN.PY TOP LEVEL: firestore.client() - SUCCESS. DB client obtained. *****")
         FIREBASE_INITIALIZED = True
 
 except ImportError as e:
-    print(f"***** MAIN.PY TOP LEVEL IMPORT ERROR: Module -> {e.name}, Message -> {e.msg} *****")
     logger.error(f"Failed to import required modules at top level: {e}", exc_info=True)
     # IMPORTS_SUCCESSFUL remains False
 except Exception as e:
-    print(f"***** MAIN.PY TOP LEVEL UNEXPECTED ERROR (likely during Firebase init or other): {type(e).__name__} - {e} *****")
     logger.error(f"Unexpected error during top-level imports or Firebase init: {e}", exc_info=True)
     # IMPORTS_SUCCESSFUL and FIREBASE_INITIALIZED might be False
-finally:
-    print(f"***** MAIN.PY TOP LEVEL: END OF TRY-EXCEPT-FINALLY. IMPORTS_SUCCESSFUL: {IMPORTS_SUCCESSFUL}, FIREBASE_INITIALIZED: {FIREBASE_INITIALIZED} *****")
-
 
 @functions_framework.http
 def run_signal_generation(request):
@@ -104,32 +75,26 @@ def run_signal_generation(request):
     global db # Ensure we use the potentially initialized global db client
 
     try:
-        print("***** FUNCTION run_signal_generation START *****")
         logger.info("-------------------------------------------")
         logger.info("Starting signal generation cycle...")
 
         if not IMPORTS_SUCCESSFUL:
             error_message = "CRITICAL: Required modules failed to import during top-level load. Aborting."
-            print(error_message)
             logger.critical(error_message)
             return "Internal Server Error: Module import failed", 500
 
         if not FIREBASE_INITIALIZED or db is None:
             error_message = "CRITICAL: Firebase not initialized or DB client is None. Aborting function execution."
-            print(error_message)
             logger.critical(error_message)
             # Attempt re-initialization as a fallback (might not be effective if top-level failed badly)
             try:
                 if not firebase_admin._apps:
-                    print("Attempting Firebase re-initialization inside function...")
                     firebase_admin.initialize_app()
                     db = firestore.client()
-                    print("Firebase re-initialized successfully inside function.")
                 elif db is None:
                     db = firestore.client()
                 if db is None: raise Exception("Failed to get valid DB client after re-attempt.")
             except Exception as init_err:
-                print(f"Firebase re-initialization failed: {init_err}")
                 logger.error(f"Firebase re-initialization failed: {init_err}", exc_info=True)
                 return "Internal Server Error: Firebase re-initialization failed", 500
             # If still not good, abort.
@@ -223,7 +188,6 @@ def run_signal_generation(request):
     
     except Exception as e:
         final_error_message = f"***** CRITICAL ERROR in run_signal_generation: {e} *****"
-        print(final_error_message)
         logger.error(final_error_message, exc_info=True)
         return f"Internal Server Error: {e}", 500
 

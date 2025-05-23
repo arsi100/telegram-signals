@@ -237,22 +237,26 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
             "evening_star": (evening_star == -100),
         }
 
-        # Log raw_detections - REDUCED VERBOSITY
-        logger.info("Raw pattern detections summary:")
+        # Log raw_detections - MUCH REDUCED VERBOSITY
+        total_patterns_detected = 0
+        patterns_with_detections = []
+        
         for pattern_key, series in raw_detections.items():
-            if hasattr(series, 'empty') and not series.empty: # Check if it's a Series and not empty
+            if hasattr(series, 'empty') and not series.empty:
                 try:
-                    # Just show if any pattern was detected, not all 15 rows
                     any_detected = series.any()
-                    recent_count = series.tail(15).sum() if hasattr(series, 'sum') else 0
-                    symbol_info = df['symbol'].iloc[-1] if 'symbol' in df.columns and not df.empty else "current_symbol"
-                    logger.info(f"  {pattern_key} for {symbol_info}: Any detected: {any_detected}, Recent (last 15): {recent_count}")
-                except Exception as e:
-                    logger.info(f"  {pattern_key} (error getting summary): {series}") # Fallback logging
-            elif isinstance(series, pd.Series) and series.empty:
-                 logger.info(f"  {pattern_key}: Empty pandas Series")
-            else:
-                logger.info(f"  {pattern_key}: Not a non-empty Series (type: {type(series)}, value: {series})")
+                    if any_detected:
+                        recent_count = series.tail(15).sum() if hasattr(series, 'sum') else 0
+                        total_patterns_detected += recent_count
+                        patterns_with_detections.append(f"{pattern_key}({recent_count})")
+                except Exception:
+                    pass  # Skip problematic patterns silently
+        
+        # Single summary log instead of 6 individual pattern logs
+        if patterns_with_detections:
+            symbol_info = df['symbol'].iloc[-1] if 'symbol' in df.columns and not df.empty else "current_symbol"
+            logger.info(f"Pattern summary for {symbol_info}: {', '.join(patterns_with_detections)} (total: {total_patterns_detected})")
+        # No logging if no patterns detected to reduce noise
 
         confirmed_patterns_all = {key: np.array([False] * len(df)) for key in pattern_details}
         
