@@ -153,9 +153,9 @@ def analyze_volume(df: pd.DataFrame, return_all=False):
         volume_ratio_series = volume_series / avg_volume_series
         volume_ratio_series.replace([np.inf, -np.inf], np.nan, inplace=True)
         volume_ratio_series.fillna(1.0, inplace=True)
-        # Use configured factor if available, else default to 1.0
-        spike_factor = getattr(config, 'VOLUME_SPIKE_FACTOR', 1.0)
-        high_volume_series = volume_ratio_series > spike_factor 
+        # Use Phase 1 multiplier: volume must be > 1.5x recent average
+        spike_factor = getattr(config, 'VOLUME_MULTIPLIER', 1.5)
+        high_volume_series = volume_ratio_series > spike_factor
 
         results_all_series = {
             "current_volume": volume_series, "avg_volume": avg_volume_series,
@@ -184,7 +184,9 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
         "hammer": {"name": "Hammer", "type": "bullish"},
         "shooting_star": {"name": "Shooting Star", "type": "bearish"},
         "bullish_engulfing": {"name": "Bullish Engulfing", "type": "bullish"},
-        "bearish_engulfing": {"name": "Bearish Engulfing", "type": "bearish"}
+        "bearish_engulfing": {"name": "Bearish Engulfing", "type": "bearish"},
+        "morning_star": {"name": "Morning Star", "type": "bullish"},
+        "evening_star": {"name": "Evening Star", "type": "bearish"}
     }
     default_result_latest = {
         "pattern_name": "N/A", "pattern_type": "neutral", "pattern_detected_raw": False
@@ -200,10 +202,12 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
         # Load only the specific candlestick patterns we need instead of all patterns
         # This avoids TA-Lib warnings for patterns we don't use
         try:
-            # Only load the 4 patterns we actually need
+            # Only load the 6 patterns we actually need
             df.ta.cdl_hammer(append=True)
             df.ta.cdl_shootingstar(append=True) 
             df.ta.cdl_engulfing(append=True)
+            df.ta.cdl_morningstar(append=True)
+            df.ta.cdl_eveningstar(append=True)
         except Exception as e:
             logger.warning(f"Error loading specific candlestick patterns: {e}")
             # Fallback: create empty columns if pattern loading fails
@@ -211,6 +215,8 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
             df["CDL_HAMMER"] = pd.Series([0]*series_len, index=df.index)
             df["CDL_SHOOTINGSTAR"] = pd.Series([0]*series_len, index=df.index)
             df["CDL_ENGULFING"] = pd.Series([0]*series_len, index=df.index)
+            df["CDL_MORNINGSTAR"] = pd.Series([0]*series_len, index=df.index)
+            df["CDL_EVENINGSTAR"] = pd.Series([0]*series_len, index=df.index)
 
         # Access the appended columns
         # pandas-ta cdl functions return 0 (no pattern), 100 (bullish), or -100 (bearish)
@@ -219,12 +225,16 @@ def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, vo
         raw_hammer = df["CDL_HAMMER"] if "CDL_HAMMER" in df.columns else pd.Series([0]*series_len, index=df.index)
         raw_shooting_star = df["CDL_SHOOTINGSTAR"] if "CDL_SHOOTINGSTAR" in df.columns else pd.Series([0]*series_len, index=df.index)
         engulfing = df["CDL_ENGULFING"] if "CDL_ENGULFING" in df.columns else pd.Series([0]*series_len, index=df.index)
+        morning_star = df["CDL_MORNINGSTAR"] if "CDL_MORNINGSTAR" in df.columns else pd.Series([0]*series_len, index=df.index)
+        evening_star = df["CDL_EVENINGSTAR"] if "CDL_EVENINGSTAR" in df.columns else pd.Series([0]*series_len, index=df.index)
 
         raw_detections = {
             "hammer": (raw_hammer == 100),
             "shooting_star": (raw_shooting_star == -100),
             "bullish_engulfing": (engulfing == 100),
             "bearish_engulfing": (engulfing == -100),
+            "morning_star": (morning_star == 100),
+            "evening_star": (evening_star == -100),
         }
 
         # Log raw_detections - REDUCED VERBOSITY

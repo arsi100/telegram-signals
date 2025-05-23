@@ -60,13 +60,20 @@ SIGNAL_COOLDOWN_MINUTES = 15
 # Technical analysis parameters
 RSI_PERIOD = 14
 SMA_PERIOD = 50
-VOLUME_PERIOD = 50
+VOLUME_PERIOD = 20
+
+# RSI Thresholds - Phase 1 optimization
+RSI_OVERSOLD_THRESHOLD = 35
+RSI_OVERBOUGHT_THRESHOLD = 65
+
+# Volume Analysis
+VOLUME_MULTIPLIER = 1.5
 
 # Logging Configuration
 LOG_LEVEL = "INFO" # Default logging level (e.g., DEBUG, INFO, WARNING, ERROR)
 
 # Signal Generation Parameters
-CONFIDENCE_THRESHOLD = 80 # Minimum confidence score (0-100) to generate a signal
+CONFIDENCE_THRESHOLD = 70
 
 # New additions
 KLINE_INTERVAL = "15m"  # Default interval for kline data

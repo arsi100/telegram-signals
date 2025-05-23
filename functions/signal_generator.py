@@ -21,16 +21,16 @@ def calculate_local_confidence(tech_results):
     score = 0
     components = {}
 
-    patterns = tech_results['patterns']
+    patterns = tech_results['raw_patterns_result']
     rsi = tech_results['rsi']
-    volume_high = tech_results['volume']['high_volume']
+    volume_high = tech_results['volume_increase']
     sma = tech_results['sma']
     price = tech_results['latest_close']
 
     # Pattern Score (Max 40)
     # Check for confirmed patterns
-    is_bullish_pattern = patterns.get('confirmed_hammer', False) or patterns.get('confirmed_bullish_engulfing', False)
-    is_bearish_pattern = patterns.get('confirmed_shooting_star', False) or patterns.get('confirmed_bearish_engulfing', False)
+    is_bullish_pattern = patterns.get('confirmed_hammer', False) or patterns.get('confirmed_bullish_engulfing', False) or patterns.get('confirmed_morning_star', False)
+    is_bearish_pattern = patterns.get('confirmed_shooting_star', False) or patterns.get('confirmed_bearish_engulfing', False) or patterns.get('confirmed_evening_star', False)
     if is_bullish_pattern or is_bearish_pattern:
         score += 40
         components['pattern'] = 40
@@ -39,12 +39,12 @@ def calculate_local_confidence(tech_results):
 
     # RSI Score (Max 30)
     rsi_score = 0
-    if is_bullish_pattern and rsi < 30: # Oversold for long
+    if is_bullish_pattern and rsi < config.RSI_OVERSOLD_THRESHOLD: # Oversold for long
         # Score based on how deep into oversold (max score at RSI 10 or less)
-        rsi_score = max(0, min(1, (30 - rsi) / 20)) * 30
-    elif is_bearish_pattern and rsi > 70: # Overbought for short
+        rsi_score = max(0, min(1, (config.RSI_OVERSOLD_THRESHOLD - rsi) / 25)) * 30
+    elif is_bearish_pattern and rsi > config.RSI_OVERBOUGHT_THRESHOLD: # Overbought for short
         # Score based on how deep into overbought (max score at RSI 90 or more)
-        rsi_score = max(0, min(1, (rsi - 70) / 20)) * 30
+        rsi_score = max(0, min(1, (rsi - config.RSI_OVERBOUGHT_THRESHOLD) / 25)) * 30
     score += rsi_score
     components['rsi'] = rsi_score
 
@@ -111,8 +111,8 @@ def process_crypto_data(symbol, kline_data, db):
 
         # 4. Determine Potential Signal Type based on patterns
         signal_intent = None
-        is_bullish_pattern = patterns.get('confirmed_hammer', False) or patterns.get('confirmed_bullish_engulfing', False)
-        is_bearish_pattern = patterns.get('confirmed_shooting_star', False) or patterns.get('confirmed_bearish_engulfing', False)
+        is_bullish_pattern = patterns.get('confirmed_hammer', False) or patterns.get('confirmed_bullish_engulfing', False) or patterns.get('confirmed_morning_star', False)
+        is_bearish_pattern = patterns.get('confirmed_shooting_star', False) or patterns.get('confirmed_bearish_engulfing', False) or patterns.get('confirmed_evening_star', False)
 
         if is_bullish_pattern:
             signal_intent = "LONG"
@@ -142,10 +142,10 @@ def process_crypto_data(symbol, kline_data, db):
                  logger.info(f"Exit condition met for {symbol}: Profit target reached.")
                  exit_signal = True
             # Reversal Signal Exit 
-            elif position_type == "LONG" and is_bearish_pattern and rsi > 70:
+            elif position_type == "LONG" and is_bearish_pattern and rsi > config.RSI_OVERBOUGHT_THRESHOLD:
                  logger.info(f"Exit condition met for {symbol}: Bearish reversal pattern and RSI > 70.")
                  exit_signal = True
-            elif position_type == "SHORT" and is_bullish_pattern and rsi < 30:
+            elif position_type == "SHORT" and is_bullish_pattern and rsi < config.RSI_OVERSOLD_THRESHOLD:
                  logger.info(f"Exit condition met for {symbol}: Bullish reversal pattern and RSI < 30.")
                  exit_signal = True
                  
@@ -210,13 +210,13 @@ def process_crypto_data(symbol, kline_data, db):
             
             if signal_intent == "LONG":
                 # Check all strict conditions for LONG entry
-                if rsi < 30 and is_high_volume and (price < sma):
+                if rsi < config.RSI_OVERSOLD_THRESHOLD and is_high_volume and (price < sma):
                     logger.info(f"Potential LONG entry conditions met for {symbol}.")
                     entry_signal_conditions_met = True
                     final_signal_type = "LONG"
             elif signal_intent == "SHORT":
                  # Check all strict conditions for SHORT entry
-                 if rsi > 70 and is_high_volume and (price > sma):
+                 if rsi > config.RSI_OVERBOUGHT_THRESHOLD and is_high_volume and (price > sma):
                      logger.info(f"Potential SHORT entry conditions met for {symbol}.")
                      entry_signal_conditions_met = True
                      final_signal_type = "SHORT"
