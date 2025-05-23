@@ -14,137 +14,126 @@ logger = logging.getLogger(__name__)
 # Define the Gemini model name
 GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"
 
-def get_confidence_score(symbol: str, signal_intent: str, tech_results: dict):
+def get_confidence_score(tech_results: dict, sentiment_confidence: float = 0.0) -> float:
     """
-    Calculate a confidence score using the Google Gemini API based on technical analysis.
+    Calculate confidence score based on technical analysis and sentiment.
     
     Args:
-        symbol: The trading symbol (e.g., 'PF_XBTUSD').
-        signal_intent: The potential signal type ("LONG" or "SHORT").
-        tech_results: Dictionary containing technical analysis results 
-                      (output from analyze_technicals).
-    
+        tech_results: Dictionary containing technical analysis results
+        sentiment_confidence: Float between 0 and 1 representing sentiment confidence
+        
     Returns:
-        Confidence score (float 0-100) or None if API call/parsing fails.
+        Float between 0 and 100 representing overall confidence
     """
-    api_key = config.GEMINI_API_KEY
-    
-    if not api_key:
-        logger.warning("Gemini API key not found in config. Cannot calculate Gemini confidence score.")
-        return None # Indicate failure to caller
-    
     try:
-        # Configure the Gemini API
-        genai.configure(api_key=api_key)
+        # Initialize confidence components
+        pattern_confidence = 0.0
+        rsi_confidence = 0.0
+        volume_confidence = 0.0
+        ema_confidence = 0.0
+        multi_timeframe_confidence = 0.0
         
-        # Set up the model
-        generation_config = genai.GenerationConfig(
-            temperature=0.2, # Lower temperature for more deterministic score
-            top_p=1.0,
-            top_k=1,
-            max_output_tokens=50 # Expecting just a number
-        )
-        model = genai.GenerativeModel(model_name=GEMINI_MODEL_NAME, generation_config=generation_config)
-        
-        # --- Construct the Enhanced Prompt with Multi-timeframe and Sentiment --- 
-        price = tech_results.get('latest_close', 'N/A')
-        rsi = tech_results.get('rsi', 50.0)
-        ema = tech_results.get('ema', price)  # Changed from sma to ema
-        patterns = tech_results.get('raw_patterns_result', {})
-        volume_info = tech_results.get('raw_volume_analysis', {})
-        volume_status = "High" if tech_results.get('volume_increase', False) else "Normal/Low"
-        volume_ratio = volume_info.get('volume_ratio', 1.0)
-        atr_filter = tech_results.get('atr_filter_passed', False)
-        
-        # Get multi-timeframe analysis
-        try:
-            from .multi_timeframe_analysis import analyze_higher_timeframes
-            mtf_result = analyze_higher_timeframes(symbol)
-            mtf_trend = mtf_result.get('trend_direction', 'neutral')
-            mtf_confirmed = mtf_result.get('trend_confirmed', False)
-        except Exception as e:
-            logger.warning(f"Could not get multi-timeframe data: {e}")
-            mtf_trend = 'neutral'
-            mtf_confirmed = False
-        
-        # Get sentiment analysis - DISABLED
-        sentiment_label = 'neutral'
-        sentiment_score = 0.0
-        
-        # Determine primary pattern
-        primary_pattern = "None"
-        if signal_intent == "LONG":
-            if patterns.get('pattern_name') and 'bullish' in patterns.get('pattern_type', '').lower():
-                primary_pattern = f"{patterns.get('pattern_name')} (bullish)"
-        elif signal_intent == "SHORT":
-            if patterns.get('pattern_name') and 'bearish' in patterns.get('pattern_type', '').lower():
-                primary_pattern = f"{patterns.get('pattern_name')} (bearish)"
-        
-        # Interpret RSI
-        rsi_interp = "neutral"
-        if rsi < config.RSI_OVERSOLD_THRESHOLD: rsi_interp = f"oversold (< {config.RSI_OVERSOLD_THRESHOLD})"
-        elif rsi > config.RSI_OVERBOUGHT_THRESHOLD: rsi_interp = f"overbought (> {config.RSI_OVERBOUGHT_THRESHOLD})"
-        
-        # Interpret Price vs EMA
-        ema_interp = "N/A"
-        if isinstance(price, (int, float)) and isinstance(ema, (int, float)) and ema != 0:
-             if price < ema: ema_interp = f"Price below 20-period EMA ({ema:.2f})"
-             elif price > ema: ema_interp = f"Price above 20-period EMA ({ema:.2f})"
-             else: ema_interp = f"Price at 20-period EMA ({ema:.2f})"
-
-        # Directional target
-        target_move = "1-3% price increase" if signal_intent == "LONG" else "1-3% price decrease"
-
-        prompt = f"""
-        Analyze the likelihood of a successful crypto trade based on the following technical indicators for a potential {signal_intent} signal on {symbol} at ${price:.2f}:
-        
-        PRIMARY INDICATORS:
-        - Candlestick Pattern: {primary_pattern}
-        - RSI (7-period): {rsi:.2f} ({rsi_interp})
-        - Volume: {volume_status} ({volume_ratio:.2f}x average)
-        - EMA (20-period): {ema_interp}
-        - ATR Volatility Filter: {'Passed' if atr_filter else 'Failed'}
-        
-        MULTI-TIMEFRAME ANALYSIS:
-        - Higher Timeframe Trend: {mtf_trend} ({'confirmed' if mtf_confirmed else 'not confirmed'})
-        
-        Based on these technical indicators, what is the confidence score (an integer from 0 to 100) that this {signal_intent} signal will achieve a {target_move} within the next few hours?
-        
-        Consider:
-        - Pattern strength and confirmation
-        - RSI alignment with signal direction
-        - Volume confirmation
-        - Trend alignment across timeframes
-        - Volatility conditions
-        
-        Return ONLY the integer confidence score, without any explanation or other text.
-        Confidence Score: 
-        """
-        # --- End Prompt Construction ---
-        
-        logger.debug(f"Generated Gemini prompt for {symbol} {signal_intent}:\n{prompt}")
-        
-        # Generate the response
-        response = model.generate_content(prompt)
-        
-        # --- Parse the Confidence Score --- 
-        score_text = response.text.strip()
-        logger.debug(f"Received Gemini response: '{score_text}'")
-        
-        # Try to extract a number (integer or float) between 0 and 100
-        match = re.search(r'\b([0-9]{1,2}|100)\b', score_text) # Find 1-3 digit numbers up to 100
-        
-        if match:
-            confidence = float(match.group(1))
-            logger.info(f"Extracted confidence score {confidence} from Gemini response for {symbol} {signal_intent}.")
-            return confidence
+        # 1. Pattern Analysis (35%)
+        pattern = tech_results.get('pattern', {})
+        if pattern.get('pattern_detected_raw', False):
+            pattern_confidence = 1.0  # Full confidence for confirmed patterns
+            
+        # 2. RSI Analysis (25%)
+        rsi = tech_results.get('rsi', 50)
+        if rsi < config.RSI_OVERSOLD_THRESHOLD:
+            rsi_confidence = 1.0  # Strong oversold
+        elif rsi > config.RSI_OVERBOUGHT_THRESHOLD:
+            rsi_confidence = 1.0  # Strong overbought
         else:
-            logger.warning(f"Failed to extract a valid confidence score (0-100) from Gemini response for {symbol} {signal_intent}. Response: '{score_text}'")
-            return None # Indicate failure to caller
+            # Linear interpolation between thresholds
+            if rsi < 50:
+                rsi_confidence = (config.RSI_OVERSOLD_THRESHOLD - rsi) / config.RSI_OVERSOLD_THRESHOLD
+            else:
+                rsi_confidence = (rsi - config.RSI_OVERBOUGHT_THRESHOLD) / (100 - config.RSI_OVERBOUGHT_THRESHOLD)
+                
+        # 3. Volume Analysis (20%)
+        volume_analysis = tech_results.get('volume_analysis', {})
+        volume_tier = volume_analysis.get('volume_tier', 'UNKNOWN')
+        volume_ratio = volume_analysis.get('volume_ratio', 0)
+        
+        if volume_tier == 'EXTREME':
+            volume_confidence = 1.0
+        elif volume_tier == 'HIGH':
+            volume_confidence = 0.8
+        elif volume_tier == 'ELEVATED':
+            volume_confidence = 0.6
+        elif volume_tier == 'NORMAL':
+            volume_confidence = 0.4
+        elif volume_tier == 'LOW':
+            volume_confidence = 0.2
+        else:  # VERY_LOW
+            volume_confidence = 0.0
+            
+        # Add bonus for early trend signals
+        if volume_analysis.get('early_trend_signal', False):
+            volume_confidence *= 1.2  # 20% boost
+            
+        # 4. EMA Trend Analysis (10%)
+        ema = tech_results.get('ema', 0)
+        price = tech_results.get('latest_close', 0)
+        if price > ema:
+            ema_confidence = 1.0  # Uptrend
+        else:
+            ema_confidence = 0.0  # Downtrend
+            
+        # 5. Multi-timeframe Analysis (10%)
+        if config.MULTI_TIMEFRAME_ENABLED:
+            # This would be implemented when multi-timeframe data is available
+            multi_timeframe_confidence = 0.5  # Placeholder
+            
+        # Calculate weighted confidence
+        confidence = (
+            pattern_confidence * config.CONFIDENCE_WEIGHTS['pattern'] +
+            rsi_confidence * config.CONFIDENCE_WEIGHTS['rsi'] +
+            volume_confidence * config.CONFIDENCE_WEIGHTS['volume'] +
+            ema_confidence * config.CONFIDENCE_WEIGHTS['ema'] +
+            multi_timeframe_confidence * config.CONFIDENCE_WEIGHTS['multi_timeframe'] +
+            sentiment_confidence  # Already weighted in get_sentiment_confidence
+        ) * 100  # Convert to percentage
+        
+        # Log confidence components
+        logger.info(f"Confidence components for {tech_results.get('symbol', 'unknown')}:")
+        logger.info(f"Pattern: {pattern_confidence:.2f} ({config.CONFIDENCE_WEIGHTS['pattern']*100}%)")
+        logger.info(f"RSI: {rsi_confidence:.2f} ({config.CONFIDENCE_WEIGHTS['rsi']*100}%)")
+        logger.info(f"Volume: {volume_confidence:.2f} ({config.CONFIDENCE_WEIGHTS['volume']*100}%)")
+        logger.info(f"EMA: {ema_confidence:.2f} ({config.CONFIDENCE_WEIGHTS['ema']*100}%)")
+        logger.info(f"Multi-timeframe: {multi_timeframe_confidence:.2f} ({config.CONFIDENCE_WEIGHTS['multi_timeframe']*100}%)")
+        logger.info(f"Sentiment: {sentiment_confidence:.2f} ({config.SENTIMENT_WEIGHT*100}%)")
+        logger.info(f"Final confidence: {confidence:.2f}%")
+        
+        return min(max(confidence, 0), 100)  # Ensure between 0 and 100
+        
+    except Exception as e:
+        logger.error(f"Error calculating confidence score: {e}")
+        return 0.0
+
+def should_generate_signal(confidence: float, signal_type: str) -> bool:
+    """
+    Determine if a signal should be generated based on confidence and type.
+    
+    Args:
+        confidence: Float between 0 and 100 representing confidence score
+        signal_type: String indicating signal type (LONG, SHORT, EXIT, etc.)
+        
+    Returns:
+        Boolean indicating whether to generate signal
+    """
+    try:
+        if signal_type == "EXIT":
+            return confidence >= config.MIN_CONFIDENCE_EXIT
+        elif signal_type.startswith("AVG_"):
+            return confidence >= config.MIN_CONFIDENCE_AVG
+        else:  # LONG or SHORT
+            return confidence >= config.MIN_CONFIDENCE_ENTRY
             
     except Exception as e:
-        logger.error(f"Error calling Gemini API for {symbol} {signal_intent}: {e}", exc_info=True)
-        return None # Indicate failure to caller
+        logger.error(f"Error in should_generate_signal: {e}")
+        return False
 
 def calculate_enhanced_local_confidence(symbol, signal_intent, tech_results):
     """
@@ -208,7 +197,7 @@ def calculate_enhanced_local_confidence(symbol, signal_intent, tech_results):
 
         logger.info(f"Enhanced local confidence for {symbol} {signal_intent}: {score:.1f} - {components}")
         return min(score, 100)  # Cap at 100
-
+            
     except Exception as e:
         logger.error(f"Error calculating enhanced local confidence for {symbol}: {e}", exc_info=True)
         return 50  # Default neutral score

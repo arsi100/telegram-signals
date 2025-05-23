@@ -159,48 +159,129 @@ def calculate_sma(df: pd.DataFrame, return_all=False):
         last_close = df['close'].iloc[-1] if not df.empty and 'close' in df.columns else None
         return np.array([]) if return_all else last_close
 
-def analyze_volume(df: pd.DataFrame, return_all=False):
-    """Analyze trading volume, calculating average volume and identifying high volume periods."""
-    default_result_latest = {
-        "current_volume": 0.0, "avg_volume": 0.0,
-        "volume_ratio": 1.0, "high_volume": False
-    }
-    default_result_all = {key: np.array([]) for key in default_result_latest}
-
+def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
+    """
+    Advanced volume analysis based on institutional trading research.
+    Implements multi-tier volume classification and order flow detection.
+    """
     try:
-        if df.empty or 'volume' not in df.columns or len(df['volume']) < config.VOLUME_PERIOD:
-            logger.warning(f"Not enough data points or missing 'volume' column ({len(df) if not df.empty else 0}) for volume analysis with period {config.VOLUME_PERIOD}")
-            return default_result_all if return_all else default_result_latest
+        default_result_latest = {
+            'current_volume': 0.0,
+            'avg_volume': 0.0,
+            'volume_ratio': 0.0,
+            'volume_tier': 'UNKNOWN',
+            'volume_momentum': 0.0,
+            'volume_profile_strength': 0.0,
+            'early_trend_signal': False,
+            'late_entry_warning': False,
+            'institutional_activity': False
+        }
         
-        volume_series = df['volume']
-        avg_volume_series = volume_series.rolling(window=config.VOLUME_PERIOD).mean().shift(1)
-        volume_ratio_series = volume_series / avg_volume_series
-        volume_ratio_series.replace([np.inf, -np.inf], np.nan, inplace=True)
-        volume_ratio_series.fillna(1.0, inplace=True)
-        # Use Phase 1 multiplier: volume must be > 1.5x recent average
-        spike_factor = getattr(config, 'VOLUME_MULTIPLIER', 1.5)
-        high_volume_series = volume_ratio_series > spike_factor
+        if df.empty or 'volume' not in df.columns:
+            logger.warning("analyze_volume_advanced: No volume data available")
+            return default_result_latest
 
-        results_all_series = {
-            "current_volume": volume_series, "avg_volume": avg_volume_series,
-            "volume_ratio": volume_ratio_series, "high_volume": high_volume_series
+        # Calculate various volume metrics
+        current_volume = float(df['volume'].iloc[-1])
+        
+        # Multi-period volume averages (institutional approach)
+        volume_5 = df['volume'].tail(5).mean()
+        volume_20 = df['volume'].tail(20).mean() 
+        volume_50 = df['volume'].tail(50).mean() if len(df) >= 50 else df['volume'].mean()
+        volume_200 = df['volume'].tail(200).mean() if len(df) >= 200 else df['volume'].mean()
+        
+        # Volume ratios for different timeframes
+        ratio_current = current_volume / volume_20 if volume_20 > 0 else 0
+        ratio_short = volume_5 / volume_20 if volume_20 > 0 else 0
+        ratio_medium = volume_20 / volume_50 if volume_50 > 0 else 0
+        ratio_long = volume_50 / volume_200 if volume_200 > 0 else 0
+        
+        # Volume momentum (trend in volume)
+        if len(df) >= 10:
+            recent_vol_trend = np.polyfit(range(10), df['volume'].tail(10), 1)[0]
+            volume_momentum = recent_vol_trend / volume_20 if volume_20 > 0 else 0
+        else:
+            volume_momentum = 0
+            
+        # Volume Profile Strength (price-volume relationship)
+        if len(df) >= 20:
+            price_returns = df['close'].pct_change().tail(20)
+            volume_changes = df['volume'].pct_change().tail(20)
+            correlation = price_returns.corr(volume_changes)
+            volume_profile_strength = abs(correlation) if not pd.isna(correlation) else 0
+        else:
+            volume_profile_strength = 0
+            
+        # Tier Classification (Based on Institutional Research)
+        if ratio_current >= 2.5:
+            volume_tier = 'EXTREME'  # Likely news/manipulation
+            late_entry_warning = True
+        elif ratio_current >= 1.8:
+            volume_tier = 'HIGH'     # Late institutional/retail FOMO
+            late_entry_warning = True
+        elif ratio_current >= 1.3:
+            volume_tier = 'ELEVATED' # Good entry with confirmation
+        elif ratio_current >= 1.0:
+            volume_tier = 'NORMAL'   # Early trend potential
+        elif ratio_current >= 0.7:
+            volume_tier = 'LOW'      # Consolidation
+        else:
+            volume_tier = 'VERY_LOW' # Dead zone
+            
+        # Early Trend Detection (Quant Approach)
+        early_trend_signal = (
+            1.0 <= ratio_current <= 1.4 and  # Optimal volume range
+            volume_momentum > 0 and           # Volume trending up
+            ratio_short > 1.1 and            # Recent acceleration
+            volume_profile_strength > 0.3    # Good price-volume correlation
+        )
+        
+        # Institutional Activity Detection
+        institutional_activity = (
+            ratio_current > 1.2 and 
+            volume_profile_strength > 0.4 and
+            current_volume > volume_200 * 1.5  # Significant vs long-term average
+        )
+        
+        # Late Entry Warning
+        late_entry_warning = (
+            ratio_current > 1.8 or 
+            (ratio_current > 1.5 and volume_momentum < 0)  # High volume but declining
+        )
+        
+        result = {
+            'current_volume': current_volume,
+            'avg_volume': volume_20,
+            'volume_ratio': ratio_current,
+            'volume_tier': volume_tier,
+            'volume_momentum': volume_momentum,
+            'volume_profile_strength': volume_profile_strength,
+            'early_trend_signal': early_trend_signal,
+            'late_entry_warning': late_entry_warning,
+            'institutional_activity': institutional_activity,
+            'ratio_short': ratio_short,
+            'ratio_medium': ratio_medium,
+            'ratio_long': ratio_long
         }
 
         if return_all:
-            return {key: s.to_numpy() if isinstance(s, pd.Series) else np.array([]) for key, s in results_all_series.items()}
+            # For backtesting - return series data
+            return {
+                'volume_ratio_series': (df['volume'] / df['volume'].rolling(20).mean()).fillna(0),
+                'volume_momentum_series': df['volume'].rolling(10).apply(lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 else 0),
+                'latest_result': result
+            }
         else:
-            latest_results = {}
-            for key, series_data in results_all_series.items():
-                if series_data is not None and not series_data.empty:
-                    last_valid_idx = series_data.last_valid_index()
-                    if last_valid_idx is not None: latest_results[key] = series_data[last_valid_idx]
-                    else: latest_results[key] = default_result_latest[key]
-                else: latest_results[key] = default_result_latest[key]
-            return latest_results
+            return result
         
     except Exception as e:
-        logger.error(f"Error analyzing volume: {e}", exc_info=True)
-        return default_result_all if return_all else default_result_latest
+        logger.error(f"Error in advanced volume analysis: {e}", exc_info=True)
+        return default_result_latest
+
+# Update the existing analyze_volume function to use the new advanced version
+def analyze_volume(df: pd.DataFrame, return_all=False):
+    """Enhanced volume analysis with institutional-grade metrics"""
+    return analyze_volume_advanced(df, return_all)
 
 def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, volume_analysis_all: dict, return_all=False):
     """Detects and confirms candlestick patterns using pandas-ta and custom logic."""
@@ -550,8 +631,8 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
         ema_series_all = calculate_ema(df, return_all=True)  # Changed from sma_series_all to ema_series_all
         atr_latest = calculate_atr(df)
         atr_filter_passed = check_atr_filter(df)
-        volume_analysis_latest = analyze_volume(df)
-        volume_analysis_all = analyze_volume(df, return_all=True)
+        volume_analysis_latest = analyze_volume_advanced(df)  # Use new advanced volume analysis
+        volume_analysis_all = analyze_volume_advanced(df, return_all=True)
 
         # Log DataFrame summary instead of full rows
         if not df.empty:
@@ -562,40 +643,27 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
         else:
             logger.info("DataFrame for pattern detection is empty.")
 
-        pattern_result = detect_candlestick_patterns(df, ema_series_all, volume_analysis_all)  # Changed to use ema_series_all
-
-        current_price = df['close'].iloc[-1] if not df.empty else None
-
-        ema_cross_bullish = False
-        ema_cross_bearish = False
-        if isinstance(ema_series_all, np.ndarray) and len(ema_series_all) >= 2 and len(df['close']) >=2:
-            prev_close_val = df['close'].iloc[-2]
-            curr_close_val = df['close'].iloc[-1]
-            prev_ema_val = ema_series_all[-2]
-            curr_ema_val = ema_series_all[-1]
-
-            if not (pd.isna(prev_close_val) or pd.isna(curr_close_val) or pd.isna(prev_ema_val) or pd.isna(curr_ema_val)):
-                if prev_close_val < prev_ema_val and curr_close_val > curr_ema_val: ema_cross_bullish = True
-                elif prev_close_val > prev_ema_val and curr_close_val < curr_ema_val: ema_cross_bearish = True
+        pattern_result = detect_candlestick_patterns(df, ema_series_all, volume_analysis_all)
         
         technicals = {
             'rsi': rsi_latest,
-            'ema': ema_latest,  # Changed from 'sma' to 'ema'
+            'ema': ema_latest,
             'atr': atr_latest,
-            'atr_filter_passed': atr_filter_passed,
-            'latest_close': current_price,
-            'volume_increase': volume_analysis_latest.get('high_volume', False),
-            'pattern_detected': pattern_result.get("pattern_detected_raw", False), 
-            'pattern_bullish': pattern_result.get("pattern_type") == "bullish",
-            'pattern_bearish': pattern_result.get("pattern_type") == "bearish",
-            'pattern_name': pattern_result.get("pattern_name", "N/A"),
-            'ema_cross_bullish': ema_cross_bullish,  # Changed from 'sma_cross_bullish'
-            'ema_cross_bearish': ema_cross_bearish,  # Changed from 'sma_cross_bearish'
-            'raw_volume_analysis': volume_analysis_latest,
-            'raw_patterns_result': pattern_result 
+            'atr_filter': atr_filter_passed,
+            'volume_analysis': volume_analysis_latest,
+            'pattern': pattern_result
         }
         
-        logger.info(f"Generated technicals for {df['timestamp'].iloc[-1] if 'timestamp' in df.columns and not df.empty else 'N/A'}: RSI={rsi_latest:.1f}, EMA={ema_latest:.2f}, ATR={atr_latest:.4f}, ATR_filter={atr_filter_passed}, patterns={pattern_result.get('pattern_name', 'N/A')}")
+        # Enhanced logging with new volume metrics
+        vol_tier = volume_analysis_latest.get('volume_tier', 'UNKNOWN')
+        vol_ratio = volume_analysis_latest.get('volume_ratio', 0)
+        early_signal = volume_analysis_latest.get('early_trend_signal', False)
+        late_warning = volume_analysis_latest.get('late_entry_warning', False)
+        
+        logger.info(f"Enhanced technicals for {latest_timestamp}: RSI={rsi_latest:.1f}, EMA={ema_latest:.2f}, ATR={atr_latest:.4f}")
+        logger.info(f"Volume analysis: {vol_tier} ({vol_ratio:.2f}x), Early={early_signal}, Late_Warning={late_warning}")
+        logger.info(f"Pattern: {pattern_result.get('pattern_name', 'N/A')}, ATR_filter={atr_filter_passed}")
+        
         return technicals
 
     except ValueError as ve: 

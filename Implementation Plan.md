@@ -91,7 +91,7 @@ This document outlines the remaining tasks to complete the Cryptocurrency Tradin
 
 *   [x] `pandas-ta` is used for TA, simplifying C library dependencies.
 *   [ ] Monitor API rate limits (Kraken, Gemini, Telegram).
-*   [ ] Manage Firebase free tier quotas.
+*   [ ] Manage Firebase free tier quotas. 
 
 ## Recent Critical Fixes (May 2025)
 
