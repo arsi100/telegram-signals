@@ -682,7 +682,10 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
 
         pattern_result = detect_candlestick_patterns(df, ema_series_all, volume_analysis_all)
         
+        latest_close_price = df['close'].iloc[-1] if not df.empty and 'close' in df.columns else 0.0
+
         technicals = {
+            'latest_close': latest_close_price,
             'rsi': rsi_latest,
             'ema': ema_latest,
             'atr': atr_latest,
