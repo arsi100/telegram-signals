@@ -61,17 +61,37 @@ def process_crypto_data(symbol, kline_data, db):
         position_ref_path = current_position["ref_path"] if current_position else None
         avg_down_count = current_position.get("avg_down_count", 0) if current_position else 0
 
-        # 5. Determine Potential Signal Type based on patterns and sentiment
+        # 5. Determine Potential Signal Type based on patterns, RSI, and sentiment
         signal_intent = None
         pattern_detected = pattern.get("pattern_detected_raw", False)
         pattern_type = pattern.get("pattern_type", "")
         
+        # Primary intent from patterns
         if pattern_detected:
-            if pattern_type == "bullish" and sentiment_score > 0:
+            logger.debug(f"[SG_DEBUG] {symbol}: Pattern detected - Name: {pattern.get('pattern_name')}, Type: {pattern_type}, Raw: {pattern_detected}. Sentiment score: {sentiment_score:.2f}")
+            if pattern_type == "bullish" and sentiment_score >= config.SENTIMENT_THRESHOLD_EXTREME_OPPOSITE_PATTERN:
                 signal_intent = "LONG"
-            elif pattern_type == "bearish" and sentiment_score < 0:
+                logger.debug(f"[SG_DEBUG] {symbol}: Intent from pattern: LONG (bullish pattern, sentiment {sentiment_score:.2f} >= {config.SENTIMENT_THRESHOLD_EXTREME_OPPOSITE_PATTERN})")
+            elif pattern_type == "bearish" and sentiment_score <= config.NEGATIVE_SENTIMENT_THRESHOLD_FOR_BEARISH_PATTERN:
                 signal_intent = "SHORT"
+                logger.debug(f"[SG_DEBUG] {symbol}: Intent from pattern: SHORT (bearish pattern, sentiment {sentiment_score:.2f} <= {config.NEGATIVE_SENTIMENT_THRESHOLD_FOR_BEARISH_PATTERN})")
+            else:
+                logger.debug(f"[SG_DEBUG] {symbol}: Pattern type '{pattern_type}' and sentiment score {sentiment_score:.2f} did not align for strong LONG/SHORT intent based on pattern alone.")
+        else:
+            logger.debug(f"[SG_DEBUG] {symbol}: No pattern detected (pattern_detected_raw: {pattern_detected}). Checking RSI/Sentiment for intent.")
+
+        # Secondary intent from RSI and Sentiment (if no pattern-based intent)
+        if not signal_intent:
+            if rsi <= config.RSI_OVERSOLD_THRESHOLD and sentiment_score > config.SENTIMENT_THRESHOLD_NEUTRAL:
+                signal_intent = "LONG"
+                logger.debug(f"[SG_DEBUG] {symbol}: Intent from RSI/Sentiment: LONG (RSI {rsi:.2f} <= {config.RSI_OVERSOLD_THRESHOLD}, Sentiment {sentiment_score:.2f} > {config.SENTIMENT_THRESHOLD_NEUTRAL})")
+            elif rsi >= config.RSI_OVERBOUGHT_THRESHOLD and sentiment_score <= config.SENTIMENT_THRESHOLD_FOR_RSI_SHORT:
+                signal_intent = "SHORT"
+                logger.debug(f"[SG_DEBUG] {symbol}: Intent from RSI/Sentiment: SHORT (RSI {rsi:.2f} >= {config.RSI_OVERBOUGHT_THRESHOLD}, Sentiment {sentiment_score:.2f} <= {config.SENTIMENT_THRESHOLD_FOR_RSI_SHORT})")
+            else:
+                logger.debug(f"[SG_DEBUG] {symbol}: RSI ({rsi:.2f}) and Sentiment ({sentiment_score:.2f}) did not provide a clear LONG/SHORT intent without a pattern.")
             
+        logger.debug(f"[SG_DEBUG] {symbol}: Final initial signal_intent: {signal_intent}")
         # 6. Process Signals Based on Position Status
         final_signal = None
         
@@ -168,17 +188,41 @@ def process_crypto_data(symbol, kline_data, db):
                     }
         
         # --- Logic for NEW Positions ---
-        elif signal_intent and pattern_detected:
-            # Check volume and sentiment conditions for new entries
-            if (volume_analysis.get('volume_tier') in ['ELEVATED', 'NORMAL'] and 
-                not volume_analysis.get('late_entry_warning', False) and
-                ((signal_intent == "LONG" and sentiment_score > 0) or 
-                 (signal_intent == "SHORT" and sentiment_score < 0))):
+        elif signal_intent:
+            logger.debug(f"[SG_DEBUG] {symbol}: Evaluating NEW position for intent: {signal_intent}, pattern_detected: {pattern_detected}")
+            current_volume_tier = volume_analysis.get('volume_tier', 'UNKNOWN')
+            volume_tier_ok = current_volume_tier not in ['VERY_LOW', 'UNKNOWN']
+            late_warning = volume_analysis.get('late_entry_warning', False)
+            
+            sentiment_aligned = False
+            if pattern_detected:
+                 sentiment_aligned = (signal_intent == "LONG" and sentiment_score >= config.SENTIMENT_THRESHOLD_EXTREME_OPPOSITE_PATTERN) or \
+                                   (signal_intent == "SHORT" and sentiment_score <= config.NEGATIVE_SENTIMENT_THRESHOLD_FOR_BEARISH_PATTERN)
+            else:
+                if signal_intent == "LONG":
+                    sentiment_aligned = sentiment_score > config.SENTIMENT_THRESHOLD_NEUTRAL
+                elif signal_intent == "SHORT":
+                    sentiment_aligned = sentiment_score < config.NEGATIVE_SENTIMENT_THRESHOLD_FOR_BEARISH_PATTERN
+                else:
+                    sentiment_aligned = False
+
+
+            logger.debug(f"[SG_DEBUG] {symbol}: Volume tier OK: {volume_tier_ok} (Tier: {current_volume_tier})")
+            logger.debug(f"[SG_DEBUG] {symbol}: Late entry warning: {late_warning}")
+            logger.debug(f"[SG_DEBUG] {symbol}: Sentiment aligned for {signal_intent}: {sentiment_aligned} (Score: {sentiment_score:.2f})")
+
+            if (volume_tier_ok and 
+                not late_warning and
+                sentiment_aligned):
                 # Calculate confidence using new system
+                logger.debug(f"[SG_DEBUG] {symbol}: Pre-conditions met for new {signal_intent}. Calculating confidence...")
                 confidence = get_confidence_score(tech_results, sentiment_confidence)
+                logger.debug(f"[SG_DEBUG] {symbol}: Calculated confidence for {signal_intent}: {confidence:.2f}")
                 
                 # Check if signal should be generated based on confidence
-                if should_generate_signal(confidence, signal_intent):
+                should_gen = should_generate_signal(confidence, signal_intent)
+                logger.debug(f"[SG_DEBUG] {symbol}: should_generate_signal for {signal_intent} with confidence {confidence:.2f} returned: {should_gen}")
+                if should_gen:
                     logger.info(f"{symbol} {signal_intent} signal generated! Confidence: {confidence:.2f}")
                     final_signal = {
                         "type": signal_intent,
@@ -195,6 +239,8 @@ def process_crypto_data(symbol, kline_data, db):
                     }
                 else:
                     logger.info(f"{symbol} {signal_intent} signal rejected. Confidence {confidence:.2f} below threshold.")
+            else:
+                logger.debug(f"[SG_DEBUG] {symbol}: Pre-conditions for new {signal_intent} NOT MET. Volume OK: {volume_tier_ok}, No Late Warn: {not late_warning}, Sentiment OK: {sentiment_aligned}")
 
         # 7. Record Signal Timestamp (Only for new LONG/SHORT entries)
         if final_signal and final_signal['type'] in ["LONG", "SHORT"]:
