@@ -7,180 +7,119 @@ import os
 import sys
 import logging
 from datetime import datetime
+import unittest
+from unittest.mock import MagicMock, patch
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-def setup_logging():
-    """Setup basic logging for local testing"""
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
+# Ensure the functions directory is in the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'functions')))
 
-def test_imports():
-    """Test if all required imports work"""
-    print("=== Testing Imports ===")
-    try:
-        # Add functions directory to path
-        functions_path = os.path.join(os.path.dirname(__file__), 'functions')
-        if functions_path not in sys.path:
-            sys.path.insert(0, functions_path)
-        
-        # Test imports
-        import functions.config as config
-        print(f"✓ Config loaded - LOG_LEVEL: {config.LOG_LEVEL}")
-        
-        from functions.kraken_api import fetch_kline_data
-        print("✓ Kraken API import successful")
-        
-        from functions.technical_analysis import analyze_technicals
-        print("✓ Technical analysis import successful")
-        
-        # Test a basic API call
-        print("\n=== Testing Basic API Call ===")
-        test_pair = "PF_XBTUSD"
-        kline_data = fetch_kline_data(test_pair)
-        if kline_data:
-            print(f"✓ Successfully fetched {len(kline_data)} data points for {test_pair}")
-            print(f"Sample data point: {kline_data[-1]}")
+# Import the target function AFTER sys.path modification
+from main import run_signal_generation 
+from functions import config # To access config values if needed for mocks
+
+# Configure logging for the test script
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class TestLocalRunSignalGeneration(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        """Set up shared resources if any (e.g., initializing Firebase once)."""
+        # Check if Firebase app is already initialized to prevent re-initialization errors
+        if not firebase_admin._apps:
+            try:
+                # Try to initialize with default credentials (e.g., for local dev with gcloud auth)
+                # For this test, we are primarily mocking Firestore, so real creds might not be strictly
+                # necessary if all db interactions are perfectly mocked.
+                # However, other parts of the code might implicitly try to use Firebase.
+                cred = credentials.ApplicationDefault()
+                firebase_admin.initialize_app(cred, {
+                    'projectId': config.FIREBASE_PROJECT_ID or "test-project-id", # Use actual or a fallback
+                })
+                logger.info("Firebase Admin SDK initialized for testing.")
+            except Exception as e:
+                logger.warning(f"Could not initialize Firebase Admin SDK with ApplicationDefault: {e}. Firestore will be mocked.")
         else:
-            print("✗ Failed to fetch kline data")
-            
-        return True
-        
-    except Exception as e:
-        print(f"✗ Import failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+            logger.info("Firebase Admin SDK already initialized.")
 
-def test_volume_analysis():
-    """Test volume analysis specifically"""
-    print("\n=== Testing Volume Analysis ===")
-    try:
-        # Add functions directory to path
-        functions_path = os.path.join(os.path.dirname(__file__), 'functions')
-        if functions_path not in sys.path:
-            sys.path.insert(0, functions_path)
-            
-        from functions.kraken_api import fetch_kline_data
-        from functions.technical_analysis import analyze_technicals, analyze_volume
-        import pandas as pd
+    def setUp(self):
+        """Set up mocks for each test method."""
+        # Mock Firestore client and its methods
+        self.mock_db = MagicMock(spec=firestore.Client)
         
-        # Get data for Bitcoin
-        test_pair = "PF_XBTUSD"
-        kline_data = fetch_kline_data(test_pair)
+        # Mock collection().document().get()
+        self.mock_doc_ref = MagicMock()
+        self.mock_doc_snapshot = MagicMock()
+        self.mock_doc_ref.get.return_value = self.mock_doc_snapshot
         
-        if not kline_data:
-            print("✗ No data to analyze")
-            return
-            
-        # Convert to DataFrame for volume analysis
-        df = pd.DataFrame(kline_data)
-        if 'volume' in df.columns:
-            volume_analysis = analyze_volume(df)
-            print(f"Volume analysis result: {volume_analysis}")
-            
-            # Calculate volume statistics
-            recent_volume = df['volume'].tail(20).mean()
-            historical_avg = df['volume'].mean()
-            volume_ratio = recent_volume / historical_avg if historical_avg > 0 else 0
-            
-            print(f"Recent 20-period volume avg: {recent_volume:.2f}")
-            print(f"Historical average volume: {historical_avg:.2f}") 
-            print(f"Volume ratio (recent/historical): {volume_ratio:.2f}")
-            
-            # Show volume distribution
-            volume_percentiles = df['volume'].quantile([0.25, 0.5, 0.75, 0.9, 0.95]).round(2)
-            print(f"Volume percentiles: {volume_percentiles.to_dict()}")
-            
-        else:
-            print("✗ No volume data in kline data")
-            
-    except Exception as e:
-        print(f"✗ Volume analysis failed: {e}")
-        import traceback
-        traceback.print_exc()
+        # Mock collection().where().stream()
+        self.mock_collection_ref = MagicMock()
+        self.mock_query = MagicMock()
+        self.mock_collection_ref.where.return_value = self.mock_query
+        self.mock_query.stream.return_value = [] # Default to no open positions
 
-def analyze_current_volume_patterns():
-    """Analyze current volume patterns across multiple coins"""
-    print("\n=== Current Volume Pattern Analysis ===")
-    try:
-        functions_path = os.path.join(os.path.dirname(__file__), 'functions')
-        if functions_path not in sys.path:
-            sys.path.insert(0, functions_path)
-            
-        import functions.config as config
-        from functions.kraken_api import fetch_kline_data
-        import pandas as pd
+        self.mock_db.collection.return_value = self.mock_collection_ref
         
-        volume_stats = {}
+        # Specific mock for document creation/update paths (e.g., for cooldown or position recording)
+        self.mock_db.collection.return_value.document.return_value.set.return_value = None # Mock .set()
+        self.mock_db.collection.return_value.document.return_value.update.return_value = None # Mock .update()
+
+
+        # Patch the firestore.client() to return our mock_db
+        # This targets where `db = firestore.client()` would be called.
+        # Assuming it's called within the modules under test, e.g. position_manager.py
+        # We need to find the correct place to patch it. 
+        # Let's assume it's imported as `from firebase_admin import firestore` and then `firestore.client()` is called.
+        self.firestore_client_patcher = patch('firebase_admin.firestore.client', return_value=self.mock_db)
+        self.mock_firestore_client = self.firestore_client_patcher.start()
         
-        for coin in config.TRACKED_COINS[:5]:  # Test first 5 coins
-            print(f"\nAnalyzing {coin}...")
-            kline_data = fetch_kline_data(coin)
-            
-            if kline_data:
-                df = pd.DataFrame(kline_data)
-                if 'volume' in df.columns and len(df) > 50:
-                    # Volume metrics
-                    recent_20 = df['volume'].tail(20).mean()
-                    recent_50 = df['volume'].tail(50).mean()
-                    historical = df['volume'].mean()
-                    
-                    # Price change context
-                    price_change_1h = ((df['close'].iloc[-1] - df['close'].iloc[-13]) / df['close'].iloc[-13]) * 100 if len(df) >= 13 else 0
-                    price_change_4h = ((df['close'].iloc[-1] - df['close'].iloc[-49]) / df['close'].iloc[-49]) * 100 if len(df) >= 49 else 0
-                    
-                    volume_stats[coin] = {
-                        'recent_20_avg': recent_20,
-                        'recent_50_avg': recent_50,
-                        'historical_avg': historical,
-                        'ratio_20_hist': recent_20 / historical if historical > 0 else 0,
-                        'ratio_50_hist': recent_50 / historical if historical > 0 else 0,
-                        'price_change_1h': price_change_1h,
-                        'price_change_4h': price_change_4h,
-                        'current_volume': df['volume'].iloc[-1],
-                        'volume_spike': df['volume'].iloc[-1] / historical if historical > 0 else 0
-                    }
-                    
-        # Print analysis
-        print("\n" + "="*80)
-        print("VOLUME ANALYSIS SUMMARY")
-        print("="*80)
-        for coin, stats in volume_stats.items():
-            print(f"\n{coin}:")
-            print(f"  Current volume spike: {stats['volume_spike']:.2f}x historical")
-            print(f"  Recent 20 vs historical: {stats['ratio_20_hist']:.2f}x")
-            print(f"  Price change 1h: {stats['price_change_1h']:.2f}%")
-            print(f"  Price change 4h: {stats['price_change_4h']:.2f}%")
-            
-            # Flag interesting patterns
-            if stats['volume_spike'] > 2.0:
-                print(f"  🔥 HIGH VOLUME SPIKE: {stats['volume_spike']:.2f}x")
-            if stats['ratio_20_hist'] > 1.5:
-                print(f"  📈 ELEVATED RECENT VOLUME: {stats['ratio_20_hist']:.2f}x")
-            if abs(stats['price_change_1h']) > 2:
-                print(f"  ⚡ SIGNIFICANT PRICE MOVE: {stats['price_change_1h']:.2f}%")
-                
-    except Exception as e:
-        print(f"✗ Volume pattern analysis failed: {e}")
-        import traceback
-        traceback.print_exc()
+        # Also patch direct instantiation if it happens like `firestore.Client()`
+        self.firestore_Client_patcher_direct = patch('firebase_admin.firestore.Client', return_value=self.mock_db) # Note capital C
+        self.mock_firestore_Client_direct = self.firestore_Client_patcher_direct.start()
 
-def main():
-    """Main test function"""
-    print("🚀 CRYPTO SIGNAL TRACKER - LOCAL TESTING")
-    print("=" * 50)
-    
-    setup_logging()
-    
-    # Run tests
-    if test_imports():
-        test_volume_analysis()
-        analyze_current_volume_patterns()
-    
-    print("\n" + "=" * 50)
-    print("✅ Local testing complete!")
 
-if __name__ == "__main__":
-    main() 
+        # Mock the request object for the HTTP-triggered function
+        self.mock_request = MagicMock()
+        self.mock_request.method = 'GET'
+        self.mock_request.args = {}
+        # Add a get_json method in case the function tries to parse a body (though GET usually doesn't have one)
+        self.mock_request.get_json.return_value = {} 
+
+    def tearDown(self):
+        self.firestore_client_patcher.stop()
+        self.firestore_Client_patcher_direct.stop()
+
+    def test_run_signal_generation_live_apis(self):
+        logger.info("Starting test_run_signal_generation_live_apis...")
+        logger.info("This test uses LIVE Kraken and LunarCrush APIs. Ensure .env is configured.")
+
+        # --- Configure mock Firestore responses ---
+        # Default: No open positions, no cooldown
+        self.mock_doc_snapshot.exists = False # For cooldown check (document does not exist)
+        self.mock_query.stream.return_value = [] # For get_open_position (no documents found)
+
+        # --- Call the function ---
+        response_content, status_code = run_signal_generation(self.mock_request)
+
+        # --- Assertions ---
+        self.assertIsNotNone(response_content)
+        self.assertIn(status_code, [200, 202]) # 200 for sync, 202 if it becomes async later
+        
+        logger.info(f"run_signal_generation responded with status {status_code}")
+        logger.info(f"Response content: {response_content}")
+
+        # Check if Firestore was interacted with (at least collections were accessed)
+        self.mock_db.collection.assert_called() 
+        
+        # Add more specific assertions based on expected behavior with live data:
+        # For example, check parts of the response_content string.
+        # This is tricky with live data as signals may or may not generate.
+        # The main purpose here is to ensure the pipeline runs end-to-end without crashing.
+        self.assertTrue("Signal generation finished." in response_content)
+
+
+if __name__ == '__main__':
+    unittest.main() 
