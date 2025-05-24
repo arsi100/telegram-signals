@@ -74,27 +74,40 @@ MARKET_HOURS = {
 SIGNAL_COOLDOWN_MINUTES = 15
 
 # Technical analysis parameters - Updated for Phase 1 optimization
-RSI_PERIOD = 7  # Changed from 14 to 7 for more responsive 5-minute charts
-EMA_PERIOD = 20  # Changed from 50 to 20 for faster signals
-SMA_PERIOD = 14  # Added: Simple Moving Average period
-VOLUME_PERIOD = 10  # Changed from 20 to 10 for more responsive volume analysis
+RSI_PERIOD = 7
+EMA_PERIOD = 20
+SMA_PERIOD = 14
+VOLUME_PERIOD = 10
 
-# RSI Thresholds - Phase 1 optimization
-RSI_OVERSOLD_THRESHOLD = 35  # Changed from 30 to 35 for more signals
-RSI_OVERBOUGHT_THRESHOLD = 65  # Changed from 70 to 65 for more signals
+# RSI Thresholds
+RSI_OVERSOLD_THRESHOLD = 35
+RSI_OVERBOUGHT_THRESHOLD = 65
+RSI_NEUTRAL_ZONE_BUFFER = (45, 55)  # Narrowed for 5-minute charts, was 1
 
-# Volume Analysis - Phase 1 optimization with tiered approach
-VOLUME_MULTIPLIER = 1.05  # Changed from 1.5 to 1.05 for early entry
+# Volume Analysis
+VOLUME_EWMA_SHORT_PERIOD = 10  # Shortened, was implicitly part of VOLUME_PERIOD
+VOLUME_EWMA_LONG_PERIOD = 20   # New, for advanced volume analysis
+PRICE_RANGE_EWMA_PERIOD = 10   # New, for advanced volume analysis
+VOLUME_TIER_THRESHOLDS = {    # New structure for tiered volume
+    'EXTREME': 1.5,
+    'VERY_HIGH': 1.3,
+    'HIGH': 1.1,
+    'ELEVATED': 1.0,
+    'NORMAL': 0.8,
+    'LOW': 0.5,
+    'VERY_LOW': 0.0
+}
+# VOLUME_MULTIPLIER = 1.05 # Commented out, replaced by tiered approach
 
-# Tiered Volume Analysis for Early Entry
-VOLUME_EARLY_ENTRY = 1.05    # 1.05x average for early trend detection
-VOLUME_NORMAL_ENTRY = 1.2    # 1.2x average for standard entries  
-VOLUME_HIGH_ENTRY = 1.5      # 1.5x average for late but strong entries
+# Tiered Volume Analysis for Early Entry - Commented out, replaced by VOLUME_TIER_THRESHOLDS
+# VOLUME_EARLY_ENTRY = 1.05
+# VOLUME_NORMAL_ENTRY = 1.2
+# VOLUME_HIGH_ENTRY = 1.5
 
-# Volume Scoring Weights
-VOLUME_EARLY_WEIGHT = 0.8    # 80% volume score for early entries
-VOLUME_NORMAL_WEIGHT = 1.0   # 100% volume score for normal entries
-VOLUME_HIGH_WEIGHT = 1.2     # 120% volume score for high volume entries
+# Volume Scoring Weights - Commented out, volume confidence handled differently now
+# VOLUME_EARLY_WEIGHT = 0.8
+# VOLUME_NORMAL_WEIGHT = 1.0
+# VOLUME_HIGH_WEIGHT = 1.2
 
 # Logging Configuration
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -105,6 +118,8 @@ CONFIDENCE_THRESHOLD = 70  # Temporarily lowered from 80 to 70 for Phase 1 testi
 # ATR Parameters
 ATR_PERIOD = 14
 ATR_MULTIPLIER = 1.5
+ATR_CONFIRMATION_WINDOW = 2 # Reduced, was not explicitly here but part of pattern logic
+MIN_BODY_TO_ATR_RATIO = 0.2   # Reduced, was not explicitly here but part of pattern logic
 
 # Kline Parameters
 KLINE_INTERVAL = "5m"
@@ -128,9 +143,15 @@ SENTIMENT_ANALYSIS_ENABLED = True  # Reverted back to True
 SENTIMENT_WEIGHT = 0.20  # 20% of confidence score (NEW)
 SENTIMENT_SOURCES = ['lunarcrush']  # Using LunarCrush as primary source
 SENTIMENT_LOOKBACK_HOURS = 24
-SENTIMENT_THRESHOLD_BULLISH = 4.0  # ASS > 4.0 for bullish sentiment
-SENTIMENT_THRESHOLD_BEARISH = 2.0  # ASS < 2.0 for bearish sentiment
-SOCIAL_VOLUME_MULTIPLIER = 1.5  # Social volume > 1.5x average for bonus points
+# SENTIMENT_THRESHOLD_BULLISH = 4.0 # Commented out, replaced by new thresholds
+# SENTIMENT_THRESHOLD_BEARISH = 2.0 # Commented out, replaced by new thresholds
+SOCIAL_VOLUME_MULTIPLIER = 1.5
+
+# Sentiment Thresholds (Updated based on GROK ANALYSIS)
+SENTIMENT_THRESHOLD_EXTREME_OPPOSITE_PATTERN = 0.2  # Widened, was -0.05
+SENTIMENT_THRESHOLD_NEUTRAL = 0.05 # Was 0.2 in one Grok section, 0.05 in final config, was 0.05 originally
+NEGATIVE_SENTIMENT_THRESHOLD_FOR_BEARISH_PATTERN = -0.1  # New for SHORTs
+SENTIMENT_THRESHOLD_FOR_RSI_SHORT = 0.0  # New for RSI SHORTs
 
 # Signal Generation Parameters
 PROFIT_TARGET_PERCENT = 2.0
@@ -138,17 +159,17 @@ LOSS_TARGET_PERCENT = 2.0
 MAX_AVG_DOWN_COUNT = 2
 
 # Confidence Thresholds
-MIN_CONFIDENCE_ENTRY = 60
+MIN_CONFIDENCE_ENTRY = 10 # Lowered for testing, was 5 in one Grok section, 10 in final config, was 10 previously
 MIN_CONFIDENCE_EXIT = 45
 MIN_CONFIDENCE_AVG = 70
 
 # Confidence Score Weights
-CONFIDENCE_WEIGHTS = {
-    'pattern': 0.35,      # 35% for pattern detection
-    'rsi': 0.15,          # 15% for RSI (Momentum proxy)
-    'volume': 0.30,       # 30% for volume analysis
-    'ema': 0.0,           # 0% for EMA trend (NEW - effectively removed from main score)
-    'multi_timeframe': 0.0, # 0% for multi-timeframe (NEW - effectively removed)
-    'sentiment': 0.0,     # 0% direct weight here (NEW - handled by SENTIMENT_WEIGHT)
-    'social_volume': 0.0  # 0% direct weight here (NEW - bonus part of sentiment logic)
+CONFIDENCE_WEIGHTS = { # Updated weights
+    'pattern': 0.2,
+    'rsi': 0.3,
+    'volume': 0.4,
+    'sentiment': 0.1, # Was 0.0, now has weight
+    'ema': 0.0,
+    'multi_timeframe': 0.0,
+    'social_volume': 0.0
 }
