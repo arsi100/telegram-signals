@@ -6,7 +6,7 @@ import pytz
 from .technical_analysis import analyze_technicals
 from .confidence_calculator import get_confidence_score, should_generate_signal
 from .position_manager import get_open_position, is_in_cooldown_period, record_signal_ts
-from .sentiment_analysis import get_sentiment_score, get_sentiment_confidence
+from .sentiment_analysis import get_sentiment_score, get_sentiment_confidence, calculate_directional_sentiment_adjustment
 from .utils import is_market_hours
 from . import config
 
@@ -91,7 +91,19 @@ def process_crypto_data(symbol, kline_data, db):
             else:
                 logger.debug(f"[SG_DEBUG] {symbol}: RSI ({rsi:.2f}) and Sentiment ({sentiment_score:.2f}) did not provide a clear LONG/SHORT intent without a pattern.")
             
-        logger.debug(f"[SG_DEBUG] {symbol}: Final initial signal_intent: {signal_intent}")
+        # Apply directional sentiment adjustment if intent is determined
+        if signal_intent: # Only if we have a LONG or SHORT intent
+            lunarcrush_symbol_for_adjustment = config.LUNARCRUSH_SYMBOL_MAP.get(symbol)
+            if lunarcrush_symbol_for_adjustment:
+                directional_adjustment = calculate_directional_sentiment_adjustment(lunarcrush_symbol_for_adjustment, signal_intent)
+                original_sentiment_score = sentiment_score
+                sentiment_score += directional_adjustment
+                sentiment_score = round(max(-1.0, min(1.0, sentiment_score)), 4) # Clamp and round
+                logger.info(f"[SG_ADJUST] {symbol}: Intent {signal_intent}. Original sentiment: {original_sentiment_score:.2f}, Adjustment: {directional_adjustment:.2f}, New Sentiment: {sentiment_score:.2f}")
+            else:
+                logger.warning(f"[SG_ADJUST] {symbol}: Could not find LunarCrush symbol for directional sentiment adjustment.")
+
+        logger.debug(f"[SG_DEBUG] {symbol}: Final initial signal_intent: {signal_intent} (Sentiment after potential adjustment: {sentiment_score:.2f})")
         # 6. Process Signals Based on Position Status
         final_signal = None
         
