@@ -65,11 +65,16 @@ def fetch_kline_data(symbol: str, resolution: str = "5m", limit: Optional[int] =
         else:
             logger.warning(f"Could not parse resolution '{resolution}' for limit calculation or resolution was 0. Fetching default for {symbol}.")
     
-    logger.info(f"Fetching Kraken Kline data for {symbol} ({resolution}) from {api_url} with params: {params}")
+    logger.info(f"Fetching Kraken Kline data for {symbol} ({resolution}). URL: {api_url}, Params: {params}")
     
     try:
-        response = requests.get(api_url, params=params, timeout=15) # Increased timeout slightly
-        response.raise_for_status() 
+        response = requests.get(api_url, params=params, timeout=15)
+        logger.debug(f"Kraken API request for {symbol} sent. Status: {response.status_code}. Response headers: {response.headers}")
+        
+        response_text_snippet = response.text[:500] + "..." if len(response.text) > 500 else response.text
+        logger.debug(f"Kraken API response text (snippet) for {symbol}: {response_text_snippet}")
+
+        response.raise_for_status()
         
         data = response.json()
         
@@ -78,6 +83,7 @@ def fetch_kline_data(symbol: str, resolution: str = "5m", limit: Optional[int] =
         # Response contains a 'candles' key with a list of candle objects
         if isinstance(data, dict) and 'candles' in data and isinstance(data['candles'], list):
              raw_klines = data['candles']
+             logger.info(f"Received {len(raw_klines)} raw kline data points from Kraken API for {symbol}.")
              for kline in raw_klines:
                   # Check if kline is a dictionary with expected keys
                   if isinstance(kline, dict) and all(k in kline for k in ['time', 'open', 'high', 'low', 'close', 'volume']):
@@ -102,21 +108,23 @@ def fetch_kline_data(symbol: str, resolution: str = "5m", limit: Optional[int] =
              # Sort by timestamp ascending just in case API doesn't guarantee order
              processed_klines.sort(key=lambda x: x['timestamp'])
              
-             logger.info(f"Successfully processed {len(processed_klines)} kline data points for {symbol}")
+             logger.info(f"Successfully processed {len(processed_klines)} of {len(raw_klines)} raw kline data points for {symbol}.")
              # ---- ADDED DEBUG LOG ----
              if processed_klines:
                  logger.debug(f"Last processed kline for {symbol}: {processed_klines[-1]}")
              else:
                  logger.debug(f"Processed klines list is empty for {symbol}.")
-             # ---- END DEBUG LOG ----
              return processed_klines
         else:
-             logger.error(f"Unexpected response structure from Kraken API for {symbol}. 'candles' key missing or not a list. Response: {data}")
+             logger.error(f"Unexpected response structure from Kraken API for {symbol}. 'candles' key missing or not a list. Full Response: {response.text}")
              return None
         # --- End Data Processing Section ---
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching Kraken Kline data for {symbol}: {e}")
+        if e.response is not None:
+            logger.error(f"Kraken API Error Status: {e.response.status_code}")
+            logger.error(f"Kraken API Error Response Text: {e.response.text}")
         return None
     except Exception as e:
         logger.error(f"An unexpected error occurred processing Kraken data for {symbol}: {e}")
