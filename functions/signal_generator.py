@@ -374,6 +374,13 @@ def process_crypto_data(symbol: str, kline_data: pd.DataFrame, db: firestore.Cli
             logger.info(f"[{symbol}] No rule-based signal intent determined (pattern or RSI/Sentiment) and no open position for EXIT.")
 
     # --- Final Signal Output ---
+    # Grok Step 3: Logging for exit signal confidence check validation
+    if final_signal_details:
+        log_signal_type = final_signal_details.get("type", "UNKNOWN_TYPE")
+        log_confidence = final_signal_details.get("confidence", 0.0)
+        log_required_threshold = config.MIN_CONFIDENCE_EXIT if "EXIT" in log_signal_type else config.MIN_CONFIDENCE_ENTRY
+        logger.debug(f"[{symbol}] Final check PRE-should_generate_signal: Signal={log_signal_type}, Conf={log_confidence:.2f}, ReqThreshold={log_required_threshold:.2f}, Source={final_signal_details.get('source')}")
+
     if final_signal_details and should_generate_signal(confidence=final_signal_details.get("confidence", 0.0), signal_type=final_signal_details.get("type")):
         # Ensure essential fields from Gemini are carried over if it was the source
         if final_signal_details.get("source") == "GEMINI_AI" and gemini_analysis_result:
