@@ -17,7 +17,7 @@ steps:
     - --timeout=300s       # Function execution timeout
     - --min-instances=0    # Minimum instances
     - --max-instances=2    # Maximum instances
-    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest,LUNARCRUSH_API_KEY=lunarcrush-api-key:latest # Added LunarCrush API key
+    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest,LUNARCRUSH_API_KEY=LUNARCRUSH_API_KEY:latest # Added LunarCrush API key
     - --allow-unauthenticated
 
 # availableSecrets:
