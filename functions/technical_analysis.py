@@ -167,20 +167,20 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
     """
     try:
         default_result_latest = {
-            'current_volume': 0.0,
-            'avg_volume': 0.0, # Typically 20-period SMA of volume
-            'volume_ratio': 0.0, # current_volume / avg_volume
-            'volume_tier': 'UNKNOWN',
-            'volume_momentum': 0.0,
-            'volume_profile_strength': 0.0, # Original price-volume correlation
-            'early_trend_signal': False,
-            'late_entry_warning': False,
-            'institutional_activity': False,
-            'volume_ewma': 0.0,
-            'price_range_ewma': 0.0,
-            'vol_volatility_correlation': 0.0
-        }
-        
+                'current_volume': 0.0,
+                'avg_volume': 0.0, # Typically 20-period SMA of volume
+                'volume_ratio': 0.0, # current_volume / avg_volume
+                'volume_tier': 'UNKNOWN',
+                'volume_momentum': 0.0,
+                'volume_profile_strength': 0.0, # Original price-volume correlation
+                'early_trend_signal': False,
+                'late_entry_warning': False,
+                'institutional_activity': False,
+                'volume_ewma': 0.0,
+                'price_range_ewma': 0.0,
+                'vol_volatility_correlation': 0.0
+            }
+            
         if df.empty or 'volume' not in df.columns or 'high' not in df.columns or 'low' not in df.columns:
             logger.warning("analyze_volume_advanced: Missing volume, high, or low data.")
             return default_result_latest
@@ -219,13 +219,16 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
         else:
             volume_profile_strength = 0
             
-        # EWMA calculations (alpha=0.1)
-        alpha_ewma = 0.1
-        volume_ewma_series = df['volume'].ewm(alpha=alpha_ewma, adjust=False).mean()
+        # EWMA calculations
+        # alpha_ewma = 0.1 # Old hardcoded alpha
+        # Use alpha derived from config periods for EWMAs
+        alpha_vol_short = 2 / (config.VOLUME_EWMA_SHORT_PERIOD + 1) if config.VOLUME_EWMA_SHORT_PERIOD > 0 else 0.1 # Default to 0.1 if period is 0
+        volume_ewma_series = df['volume'].ewm(alpha=alpha_vol_short, adjust=False).mean()
         latest_volume_ewma = volume_ewma_series.iloc[-1]
 
         df['price_range'] = df['high'] - df['low']
-        price_range_ewma_series = df['price_range'].ewm(alpha=alpha_ewma, adjust=False).mean()
+        alpha_price_range = 2 / (config.PRICE_RANGE_EWMA_PERIOD + 1) if config.PRICE_RANGE_EWMA_PERIOD > 0 else 0.1 # Default to 0.1 if period is 0
+        price_range_ewma_series = df['price_range'].ewm(alpha=alpha_price_range, adjust=False).mean()
         latest_price_range_ewma = price_range_ewma_series.iloc[-1]
 
         vol_volatility_correlation = 0.0
@@ -244,26 +247,27 @@ def analyze_volume_advanced(df: pd.DataFrame, return_all=False):
 
 
         # Tier Classification (Refined based on current_volume / 10-period SMA of volume)
-        if ratio_current > 2.0: # EXTREME >2x
-            volume_tier = 'EXTREME'
-        elif ratio_current >= 1.5: # HIGH 1.5-2x
-            volume_tier = 'HIGH'
-        elif ratio_current >= 1.2: # ELEVATED 1.2-1.5x
-            volume_tier = 'ELEVATED'
-        elif ratio_current >= 0.8: # NORMAL 0.8-1.2x
-            volume_tier = 'NORMAL'
-        elif ratio_current >= 0.5: # LOW 0.5-0.8x
-            volume_tier = 'LOW'
-        else: # VERY_LOW <0.5x
-            volume_tier = 'VERY_LOW'
-            
-        # Early Trend Detection (Quant Approach) - adjust criteria if needed
-        early_trend_signal = (
-            1.0 <= ratio_current <= 1.4 and  # Optimal volume range (consider adjusting based on new tiers)
-            volume_momentum > 0 and           # Volume trending up
-            ratio_short > 1.1 and            # Recent acceleration
-            volume_profile_strength > 0.3    # Good price-volume correlation
-        )
+        # Uses config.VOLUME_TIER_THRESHOLDS
+        volume_tier = 'UNKNOWN' # Default if no tier matches
+        # Sort tiers by threshold value in descending order to find the highest matching tier
+        sorted_tiers = sorted(config.VOLUME_TIER_THRESHOLDS.items(), key=lambda item: item[1], reverse=True)
+        
+        for tier_name, threshold in sorted_tiers:
+            if ratio_current >= threshold: # ratio_current is current_volume / avg_volume_for_ratio (10-period SMA)
+                volume_tier = tier_name
+                break # Found the highest applicable tier
+        
+        # If ratio_current is below the lowest defined threshold (e.g. VERY_LOW at 0.0), it might remain UNKNOWN
+        # or fall into the lowest category depending on threshold values.
+        # Ensuring VERY_LOW is explicitly handled if ratio_current is very small.
+        if volume_tier == 'UNKNOWN' and ratio_current < config.VOLUME_TIER_THRESHOLDS.get('LOW', 0.5): # Example fallback
+             if ratio_current <= config.VOLUME_TIER_THRESHOLDS.get('VERY_LOW', 0.0) and 'VERY_LOW' in config.VOLUME_TIER_THRESHOLDS:
+                 volume_tier = 'VERY_LOW'
+             # else it remains UNKNOWN or could be assigned to LOW if thresholds are structured that way
+
+        # Early trend and late entry warnings (Example logic, can be refined)
+        early_trend_signal = False
+        late_entry_warning = False
         
         # Institutional Activity Detection - adjust criteria if needed
         institutional_activity = (
@@ -320,284 +324,187 @@ def analyze_volume(df: pd.DataFrame, return_all=False):
     """Enhanced volume analysis with institutional-grade metrics"""
     return analyze_volume_advanced(df, return_all)
 
-def detect_candlestick_patterns(df: pd.DataFrame, sma_series_all: np.ndarray, volume_analysis_all: dict, return_all=False):
-    """Detects and confirms candlestick patterns using pandas-ta and custom logic."""
-    pattern_details = {
-        "hammer": {"name": "Hammer", "type": "bullish"},
-        "shooting_star": {"name": "Shooting Star", "type": "bearish"},
-        "bullish_engulfing": {"name": "Bullish Engulfing", "type": "bullish"},
-        "bearish_engulfing": {"name": "Bearish Engulfing", "type": "bearish"},
-        "morning_star": {"name": "Morning Star", "type": "bullish"},
-        "evening_star": {"name": "Evening Star", "type": "bearish"}
-    }
-    default_result_latest = {
-        "pattern_name": "N/A", "pattern_type": "neutral", "pattern_detected_raw": False
-    }
-    default_result_all_confirmed = {key: np.array([False] * len(df)) for key in pattern_details}
+def detect_candlestick_patterns(df: pd.DataFrame, ema_series: pd.Series = None, volume_analysis: dict = None) -> dict:
+    """
+    Detects various candlestick patterns using pandas_ta and custom logic.
+    Prioritizes the latest confirmed pattern.
+    Adds fallback for raw patterns if no confirmed pattern is found on the latest candle.
+    """
+    # Initialize results
+    pattern_summary = {"pattern_name": "N/A", "pattern_type": "neutral", "pattern_detected_raw": False, "latest_confirmed_signal": {}}
 
-    min_data_len = max(config.SMA_PERIOD, config.VOLUME_PERIOD, 20) + 5 
-    if df.empty or len(df) < min_data_len:
-        logger.warning(f"Insufficient data ({len(df)} points) for pattern detection. Need at least {min_data_len}.")
-        return default_result_all_confirmed if return_all else default_result_latest
+    if df.empty or len(df) < 3: # Need at least a few candles for pattern context
+        logger.warning("DataFrame too short for candlestick pattern detection.")
+        return pattern_summary
 
+    # Use a copy to avoid SettingWithCopyWarning
+    df_patterns = df.copy()
+
+    # Define patterns to check - focus on a few key ones for clarity
+    # We expect columns like 'CDL_HAMMER_Bull', 'CDL_DOJI_Neutral', etc.
+    # The simple name 'hammer' gives raw signals (100 for bullish, -100 for bearish)
+    # The specific TA-Lib names (e.g., CDLHAMMER) might also create boolean columns.
+    
+    # pandas-ta recommends running all patterns if specific ones are not needed.
+    # Or, specify a list of names. Let's try specific common ones for clarity.
+    patterns_to_check_talib = [
+        "hammer", "hangingman", "invertedhammer", "shootingstar",
+        "doji", "dojistar",
+        "morningstar", "eveningstar",
+        "morningdojistar", "eveningdojistar",
+        "engulfing", "dragonflydoji", "gravestonedoji",
+        # "abandonedbaby", # Often too rare or requires very specific conditions
+        # "harami", "haramicross" # Also can be less distinct
+    ]
+    
     try:
-        # Load only the specific candlestick patterns we need instead of all patterns
-        # This avoids TA-Lib warnings for patterns we don't use
-        try:
-            # Use correct pandas-ta syntax for candlestick patterns
-            # pandas-ta uses the cdl_pattern function with name parameter
-            import pandas_ta as ta
-            
-            # Create the pattern columns using pandas-ta cdl_pattern function
-            df['CDL_HAMMER'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="hammer")
-            df['CDL_SHOOTINGSTAR'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="shootingstar") 
-            df['CDL_ENGULFING'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="engulfing")
-            df['CDL_MORNINGSTAR'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="morningstar")
-            df['CDL_EVENINGSTAR'] = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name="eveningstar")
-        except Exception as e:
-            logger.warning(f"Error loading specific candlestick patterns: {e}")
-            # Fallback: create empty columns if pattern loading fails
-            series_len = len(df)
-            df["CDL_HAMMER"] = pd.Series([0]*series_len, index=df.index)
-            df["CDL_SHOOTINGSTAR"] = pd.Series([0]*series_len, index=df.index)
-            df["CDL_ENGULFING"] = pd.Series([0]*series_len, index=df.index)
-            df["CDL_MORNINGSTAR"] = pd.Series([0]*series_len, index=df.index)
-            df["CDL_EVENINGSTAR"] = pd.Series([0]*series_len, index=df.index)
-
-        # Access the appended columns
-        # pandas-ta cdl functions return 0 (no pattern), 100 (bullish), or -100 (bearish)
-        # Check if columns exist before trying to access, default to a series of zeros if not
-        series_len = len(df)
-        raw_hammer = df["CDL_HAMMER"] if "CDL_HAMMER" in df.columns else pd.Series([0]*series_len, index=df.index)
-        raw_shooting_star = df["CDL_SHOOTINGSTAR"] if "CDL_SHOOTINGSTAR" in df.columns else pd.Series([0]*series_len, index=df.index)
-        engulfing = df["CDL_ENGULFING"] if "CDL_ENGULFING" in df.columns else pd.Series([0]*series_len, index=df.index)
-        morning_star = df["CDL_MORNINGSTAR"] if "CDL_MORNINGSTAR" in df.columns else pd.Series([0]*series_len, index=df.index)
-        evening_star = df["CDL_EVENINGSTAR"] if "CDL_EVENINGSTAR" in df.columns else pd.Series([0]*series_len, index=df.index)
-
-        raw_detections = {
-            "hammer": (raw_hammer == 100),
-            "shooting_star": (raw_shooting_star == -100),
-            "bullish_engulfing": (engulfing == 100),
-            "bearish_engulfing": (engulfing == -100),
-            "morning_star": (morning_star == 100),
-            "evening_star": (evening_star == -100),
-        }
-
-        # Log raw_detections - MUCH REDUCED VERBOSITY
-        total_patterns_detected = 0
-        patterns_with_detections = []
+        # Calculate all specified TA-Lib patterns recognized by pandas-ta
+        # This will add columns like CDLHAMMER, CDLDOJI, CDLENGULFING etc.
+        # It also adds raw signal columns like 'hammer_signal' (100/-100) if using simplified names.
+        # Let's use simplified names to get raw signals easily for our fallback.
+        # And also try to get the standard TA-Lib boolean columns.
         
-        for pattern_key, series in raw_detections.items():
-            if hasattr(series, 'empty') and not series.empty:
-                try:
-                    any_detected = series.any()
-                    if any_detected:
-                        recent_count = series.tail(15).sum() if hasattr(series, 'sum') else 0
-                        total_patterns_detected += recent_count
-                        patterns_with_detections.append(f"{pattern_key}({recent_count})")
-                except Exception:
-                    pass  # Skip problematic patterns silently
-        
-        # Single summary log instead of 6 individual pattern logs
-        if patterns_with_detections:
-            symbol_info = df['symbol'].iloc[-1] if 'symbol' in df.columns and not df.empty else "current_symbol"
-            logger.info(f"Pattern summary for {symbol_info}: {', '.join(patterns_with_detections)} (total: {total_patterns_detected})")
-        # No logging if no patterns detected to reduce noise
+        # Get raw signals (e.g., 'hammer' column with 100/-100)
+        df_patterns.ta.cdl_pattern(name="all", append=True) # This adds many columns
 
-        confirmed_patterns_all = {key: np.array([False] * len(df)) for key in pattern_details}
-        
-        open_p = df['open'].to_numpy()
-        high_p = df['high'].to_numpy()
-        low_p = df['low'].to_numpy()
-        close_p = df['close'].to_numpy()
-        body_sizes_abs = np.abs(open_p - close_p)
+        # Standard TA-Lib boolean columns might be named like 'CDLHAMMER', 'CDLENGULFING'
+        # We need to check how pandas-ta names these when 'name=\"all\"' is used.
+        # It often uses names like 'CDL_DOJI_NEUTRAL', 'CDL_HAMMER_BULL', 'CDL_ENGULFING_BULL'
 
-        avg_volume_arr = volume_analysis_all.get('avg_volume', np.array([np.nan]*len(df)))
-        high_volume_arr = volume_analysis_all.get('high_volume', np.array([False]*len(df)))
-        
-        avg_body_lookback = 5 
-        loop_start_idx = avg_body_lookback + 3 
-        
-        for i in range(loop_start_idx, len(df) - 1):
-            pattern_idx = i
-            confirmation_idx = i + 1
-            prev_candle_idx = i - 1
-            engulf_context_idx = i - 3
-
-            if pd.isna(sma_series_all[pattern_idx]) or pd.isna(avg_volume_arr[pattern_idx]) or pd.isna(avg_volume_arr[confirmation_idx]):
-                continue
-
-            open_patt, high_patt, low_patt, close_patt = open_p[pattern_idx], high_p[pattern_idx], low_p[pattern_idx], close_p[pattern_idx]
-            body_patt_abs = body_sizes_abs[pattern_idx]
-            
-            open_conf, close_conf = open_p[confirmation_idx], close_p[confirmation_idx]
-            is_high_volume_patt = high_volume_arr[pattern_idx]
-            is_high_volume_conf = high_volume_arr[confirmation_idx]
-
-            avg_body_prev_candles = np.mean(body_sizes_abs[pattern_idx - avg_body_lookback : pattern_idx]) if pattern_idx >= avg_body_lookback else 0.01
-            avg_body_prev_candles = max(avg_body_prev_candles, 0.01) # Avoid division by zero
-
-            # Iterate through specific patterns for confirmation
-            for pattern_key, details in pattern_details.items():
-                # CRITICAL CHANGE HERE: Use raw_detections
-                if raw_detections[pattern_key].iloc[pattern_idx]:
-                    confirmed = False
-                    trend_check = False
-                    strength_check = False
-                    volume_check = False
-                    confirmation_candle_check = False
-
-                    # Generic Trend Confirmation (example for bullish, adapt for bearish)
-                    if details["type"] == "bullish":
-                        # Check for preceding downtrend (e.g., price < SMA or series of lower lows/highs)
-                        # For simplicity: pattern candle low is below SMA and confirmation closes above SMA
-                        if low_patt < sma_series_all[pattern_idx] and close_conf > sma_series_all[confirmation_idx]:
-                            trend_check = True 
-                        # A more robust trend: SMA is sloping down then up, or price action.
-                        # Example: sma_series_all[pattern_idx-3] > sma_series_all[pattern_idx-1] and sma_series_all[confirmation_idx] > sma_series_all[pattern_idx]
-                        if len(sma_series_all) > pattern_idx - 3 and \
-                           sma_series_all[pattern_idx-3] > sma_series_all[pattern_idx-1] and \
-                           sma_series_all[confirmation_idx] > sma_series_all[pattern_idx]:
-                            trend_check = True
-                    elif details["type"] == "bearish":
-                        # Check for preceding uptrend
-                        if high_patt > sma_series_all[pattern_idx] and close_conf < sma_series_all[confirmation_idx]:
-                            trend_check = True
-                        if len(sma_series_all) > pattern_idx - 3 and \
-                           sma_series_all[pattern_idx-3] < sma_series_all[pattern_idx-1] and \
-                           sma_series_all[confirmation_idx] < sma_series_all[pattern_idx]:
-                            trend_check = True
-                    
-                    # Volume Confirmation (Pattern or Confirmation Candle)
-                    if is_high_volume_patt or is_high_volume_conf:
-                        volume_check = True
-
-                    # Candle Strength (body size vs avg body size)
-                    if body_patt_abs > avg_body_prev_candles * config.CANDLE_BODY_STRENGTH_FACTOR:
-                        strength_check = True
-
-                    # Confirmation Candle Logic
-                    if details["type"] == "bullish" and close_conf > open_conf and close_conf > high_patt:
-                        confirmation_candle_check = True
-                    elif details["type"] == "bearish" and close_conf < open_conf and close_conf < low_patt:
-                        confirmation_candle_check = True
-                    
-                    # Specific pattern characteristics (can refine further)
-                    if pattern_key == "hammer": # Bullish
-                        lower_wick = low_patt - min(open_patt, close_patt)
-                        upper_wick = high_patt - max(open_patt, close_patt)
-                        if lower_wick > body_patt_abs * config.HAMMER_WICK_RATIO and \
-                           upper_wick < body_patt_abs * config.HAMMER_UPPER_WICK_MAX_RATIO and \
-                           trend_check and strength_check and volume_check and confirmation_candle_check:
-                            confirmed = True
-                    
-                    elif pattern_key == "shooting_star": # Bearish
-                        upper_wick = high_patt - max(open_patt, close_patt)
-                        lower_wick = min(open_patt, close_patt) - low_patt
-                        if upper_wick > body_patt_abs * config.SHOOTING_STAR_WICK_RATIO and \
-                           lower_wick < body_patt_abs * config.SHOOTING_STAR_LOWER_WICK_MAX_RATIO and \
-                           trend_check and strength_check and volume_check and confirmation_candle_check:
-                            confirmed = True
-
-                    elif pattern_key == "bullish_engulfing":
-                        # Engulfing specific checks
-                        open_prev, high_prev, low_prev, close_prev = open_p[prev_candle_idx], high_p[prev_candle_idx], low_p[prev_candle_idx], close_p[prev_candle_idx]
-                        # Pattern candle engulfs previous candle's body
-                        if close_patt > open_prev and open_patt < close_prev and \
-                           trend_check and strength_check and volume_check and confirmation_candle_check:
-                             # Additional check: current body is larger than previous body
-                            if body_patt_abs > abs(open_prev - close_prev) * config.ENGULFING_BODY_FACTOR:
-                                confirmed = True
-                                
-                    elif pattern_key == "bearish_engulfing":
-                        open_prev, high_prev, low_prev, close_prev = open_p[prev_candle_idx], high_p[prev_candle_idx], low_p[prev_candle_idx], close_p[prev_candle_idx]
-                        # Pattern candle engulfs previous candle's body
-                        if open_patt > close_prev and close_patt < open_prev and \
-                           trend_check and strength_check and volume_check and confirmation_candle_check:
-                            if body_patt_abs > abs(open_prev - close_prev) * config.ENGULFING_BODY_FACTOR:
-                                confirmed = True
-
-                    if confirmed:
-                        confirmed_patterns_all[pattern_key][confirmation_idx] = True
-                        # logger.debug(f"Confirmed {details['name']} at index {confirmation_idx} (pattern at {pattern_idx})")
-                        # Only report one pattern per confirmation candle for simplicity of return_latest
-                        break # Exit inner loop once a pattern is confirmed for this candle i
-            
-            # This break was inside the pattern_key loop, should be outside if we want one pattern per i
-            # If a pattern was confirmed for candle i (its confirmation is at i+1), then we can potentially stop for this 'i'
-            # However, the current structure with `confirmed_patterns_all` storing all allows multiple raw patterns
-            # but `return_latest` will pick one.
-            # if any(confirmed_patterns_all[key][confirmation_idx] for key in confirmed_patterns_all):
-            #    pass # continue to next i
-
-        if return_all:
-            return confirmed_patterns_all # This returns a dict of boolean arrays
-        else:
-            # Find the latest confirmed pattern
-            latest_confirmed_signal = default_result_latest.copy()
-            latest_confirmed_signal["pattern_detected_raw"] = False # Explicitly reset
-
-            # Iterate backwards from the last possible confirmation index
-            # Last pattern_idx is len(df) - 2, so last confirmation_idx is len(df) - 1
-            for i in range(len(df) - 1, loop_start_idx -1, -1): # i is confirmation_idx here
-                # Check raw detections at pattern_idx = i-1
-                raw_pattern_idx = i-1
-                if raw_pattern_idx < 0: continue
-
-                pattern_found_this_candle = False
-                for pattern_key, details in pattern_details.items():
-                    if confirmed_patterns_all[pattern_key][i]: # Check confirmed status at confirmation_idx
-                        latest_confirmed_signal["pattern_name"] = details["name"]
-                        latest_confirmed_signal["pattern_type"] = details["type"]
-                        # Check raw detection at pattern_idx for "pattern_detected_raw"
-                        # This raw_detections should use raw_pattern_idx
-                        if raw_detections[pattern_key].iloc[raw_pattern_idx]:
-                             latest_confirmed_signal["pattern_detected_raw"] = True
-                        else:
-                            # This case should ideally not happen if confirmed_patterns_all[pattern_key][i] is true
-                            # as confirmation implies raw detection. Log if it does.
-                            logger.warning(f"Confirmed pattern {details['name']} at {i} but no raw detection at {raw_pattern_idx}")
-                            latest_confirmed_signal["pattern_detected_raw"] = False
-
-
-                        pattern_found_this_candle = True
-                        break # Found the latest confirmed pattern type for this candle
-                
-                if pattern_found_this_candle:
-                    # If any pattern was confirmed and processed for this candle index i, break main loop
-                    break 
-            
-            # Fallback for pattern_detected_raw if no confirmed pattern was found by iterating backwards
-            # This ensures pattern_detected_raw reflects the very last candle's raw signals if no *confirmed* one exists
-            if latest_confirmed_signal["pattern_name"] == "N/A" and len(df) > 0:
-                last_pattern_idx = len(df) -2 # df.ta.strategy was on df up to last candle, raw detection is for pattern candle
-                if last_pattern_idx >=0:
-                    for pattern_key, details in pattern_details.items():
-                        # Check raw detection on the candle that would be 'pattern_idx' if we were confirming the last possible candle.
-                        # The columns from df.ta.strategy are for the whole df.
-                        # The last candle that could BE a pattern is len(df)-2, because confirmation is len(df)-1
-                        # However, raw_detections are on the actual candle. So use -1 for latest.
-                        # The issue is df.ta.strategy columns like "CDL_HAMMER" are results for *that* candle.
-                        # So, for the very last candle df.iloc[-1], we can check its raw pattern status.
-                        
-                        # If trying to get the raw signal for the *absolute latest* candle (df.iloc[-1]):
-                        raw_check_idx = len(df) - 1 # Index for iloc for the last candle
-                        if raw_check_idx >=0 : # Ensure df is not empty
-                            if raw_detections[pattern_key].iloc[raw_check_idx]:
-                                latest_confirmed_signal["pattern_name"] = f"Raw {details['name']}" # Indicate it's raw
-                                latest_confirmed_signal["pattern_type"] = details["type"]
-                                latest_confirmed_signal["pattern_detected_raw"] = True
-                                # logger.debug(f"No confirmed pattern, returning latest raw: {details['name']} at index {raw_check_idx}")
-                                break # Found a raw pattern for the latest candle
-
-            return latest_confirmed_signal
-        
     except Exception as e:
-        logger.error(f"Error detecting candlestick patterns: {e}", exc_info=True)
-        if return_all:
-            return default_result_all_confirmed
+        logger.error(f"Error calculating candlestick patterns with pandas_ta: {e}")
+        return pattern_summary
+
+    latest_confirmed_signal = {"pattern_name": "N/A", "pattern_type": "neutral", "pattern_detected": False, "candle_index": -1}
+    
+    # --- Prioritize Confirmed Patterns on the LATEST candle ---
+    # Check for specific pandas-ta generated boolean columns for the latest candle
+    # These columns often have _Bull, _Bear, _Neutral suffixes
+    # Example: df_patterns['CDL_HAMMER_BULL'].iloc[-1]
+    
+    # List of pattern types and their corresponding pandas-ta column suffixes
+    # This mapping might need adjustment based on exact pandas-ta output for cdl_pattern(name="all")
+    confirmed_pattern_map = {
+        "Hammer": {"col_suffix": "_HAMMER_BULL", "type": "bullish"},
+        "Inverted Hammer": {"col_suffix": "_INVERTEDHAMMER_BULL", "type": "bullish"},
+        "Morning Star": {"col_suffix": "_MORNINGSTAR_BULL", "type": "bullish"},
+        "Morning Doji Star": {"col_suffix": "_MORNINGDOJISTAR_BULL", "type": "bullish"},
+        "Bullish Engulfing": {"col_suffix": "_ENGULFING_BULL", "type": "bullish"},
+        "Dragonfly Doji": {"col_suffix": "_DRAGONFLYDOJI_BULL", "type": "bullish"}, # Usually bullish
+
+        "Hanging Man": {"col_suffix": "_HANGINGMAN_BEAR", "type": "bearish"},
+        "Shooting Star": {"col_suffix": "_SHOOTINGSTAR_BEAR", "type": "bearish"},
+        "Evening Star": {"col_suffix": "_EVENINGSTAR_BEAR", "type": "bearish"},
+        "Evening Doji Star": {"col_suffix": "_EVENINGDOJISTAR_BEAR", "type": "bearish"},
+        "Bearish Engulfing": {"col_suffix": "_ENGULFING_BEAR", "type": "bearish"},
+        "Gravestone Doji": {"col_suffix": "_GRAVESTONEDOJI_BEAR", "type": "bearish"}, # Usually bearish
+
+        "Doji": {"col_suffix": "_DOJI_NEUTRAL", "type": "neutral"},
+        # Add more confirmed patterns if needed
+    }
+
+    for p_name, p_info in confirmed_pattern_map.items():
+        col_name_prefix = "CDL" # Default prefix
+        # Check if the full column name exists, e.g., CDL_HAMMER_BULL
+        full_col_name = f"{col_name_prefix}{p_info['col_suffix']}"
+        if full_col_name in df_patterns.columns:
+            if df_patterns[full_col_name].iloc[-1]: # Check if True (or > 0)
+                latest_confirmed_signal["pattern_name"] = p_name
+                latest_confirmed_signal["pattern_type"] = p_info["type"]
+                latest_confirmed_signal["pattern_detected"] = True
+                latest_confirmed_signal["candle_index"] = -1
+                logger.debug(f"Latest candle CONFIRMED pattern: {p_name} ({p_info['type']})")
+                break # Found a confirmed pattern on the latest candle
+
+    pattern_summary["latest_confirmed_signal"] = latest_confirmed_signal
+    pattern_summary["pattern_name"] = latest_confirmed_signal["pattern_name"]
+    pattern_summary["pattern_type"] = latest_confirmed_signal["pattern_type"]
+    # pattern_detected_raw will be set by the raw check if no confirmed pattern
+
+    # --- Fallback: Check for RAW patterns in the last 3 candles if NO confirmed pattern on LATEST candle ---
+    if not latest_confirmed_signal["pattern_detected"]:
+        logger.debug("No CONFIRMED pattern on latest candle. Checking for RAW patterns in last 3 candles.")
+        # Check for raw 'hammer' signal (100 for bullish, -100 for bearish)
+        # The column name from df.ta.cdl_pattern(name='all') for raw hammer is 'CDL_HAMMER'
+        # Or if we did df.ta.cdl_pattern(name='hammer'), it would be 'CDLHAMMER'.
+        # Let's assume 'CDL_HAMMER' exists from 'all'
+        
+        raw_hammer_col = 'CDL_HAMMER' # This is what pandas-ta creates with name="all" for the raw hammer signal
+        if raw_hammer_col in df_patterns.columns:
+            for i in range(-1, -4, -1): # Check last 3 candles (index -1, -2, -3)
+                if len(df_patterns) < abs(i): # Ensure we don't go out of bounds on short DFs
+                    continue
+                
+                raw_signal_value = df_patterns[raw_hammer_col].iloc[i]
+                if raw_signal_value == 100: # Bullish Hammer
+                    pattern_summary["pattern_name"] = f"Raw Hammer ({abs(i)})"
+                    pattern_summary["pattern_type"] = "bullish"
+                    pattern_summary["pattern_detected_raw"] = True
+                    logger.info(f"Found RAW Bullish Hammer on candle index {i} (from latest).")
+                    break 
+                elif raw_signal_value == -100: # Bearish Hammer (though Hanging Man is more common for this signal)
+                    # We could map this to Hanging Man if contextually appropriate, or just "Raw Bearish Hammer"
+                    pattern_summary["pattern_name"] = f"Raw Bearish Hammer ({abs(i)})" 
+                    pattern_summary["pattern_type"] = "bearish" # Or map to Hanging Man
+                    pattern_summary["pattern_detected_raw"] = True
+                    logger.info(f"Found RAW Bearish Hammer signal on candle index {i} (from latest).")
+                    break
+            if pattern_summary["pattern_detected_raw"]:
+                 logger.debug(f"Using RAW pattern after Hammer check: {pattern_summary['pattern_name']}")
         else:
-            return default_result_latest
+            logger.warning(f"Raw hammer column '{raw_hammer_col}' not found after cdl_pattern(name='all').")
+        
+        # Add similar raw checks for Engulfing patterns if no Hammer was found yet
+        if not pattern_summary["pattern_detected_raw"]:
+            raw_engulfing_bull_col = 'CDL_ENGULFING_BULL' # pandas-ta name for confirmed Bullish Engulfing
+            raw_engulfing_bear_col = 'CDL_ENGULFING_BEAR' # pandas-ta name for confirmed Bearish Engulfing
+            # Note: pandas-ta might not have 'raw' unconfirmed engulfing signals directly in 'all'.
+            # The 'CDLENGULFING' gives a general signal (-100 for bear, 100 for bull, 0 for none).
+            # We'll use the general 'CDLENGULFING' as it's more likely to be present from cdl_pattern(name='all')
+            # and represents the pattern occurrence.
+            
+            general_engulfing_col = 'CDLENGULFING' 
+            if general_engulfing_col in df_patterns.columns:
+                for i in range(-1, -4, -1): # Check last 3 candles
+                    if len(df_patterns) < abs(i):
+                        continue
+                    raw_signal_value = df_patterns[general_engulfing_col].iloc[i]
+                    if raw_signal_value == 100: # Bullish Engulfing
+                        pattern_summary["pattern_name"] = f"Raw Bullish Engulfing ({abs(i)})"
+                        pattern_summary["pattern_type"] = "bullish"
+                        pattern_summary["pattern_detected_raw"] = True
+                        logger.info(f"Found RAW Bullish Engulfing on candle index {i} (from latest).")
+                        break
+                    elif raw_signal_value == -100: # Bearish Engulfing
+                        pattern_summary["pattern_name"] = f"Raw Bearish Engulfing ({abs(i)})"
+                        pattern_summary["pattern_type"] = "bearish"
+                        pattern_summary["pattern_detected_raw"] = True
+                        logger.info(f"Found RAW Bearish Engulfing on candle index {i} (from latest).")
+                        break
+                if pattern_summary["pattern_detected_raw"]:
+                    logger.debug(f"Using RAW pattern after Engulfing check: {pattern_summary['pattern_name']}")
+            else:
+                logger.warning(f"Raw engulfing column '{general_engulfing_col}' not found after cdl_pattern(name='all').")
+
+        # TODO: Add similar raw checks for other key patterns (e.g., Doji) if needed,
+        # by inspecting the columns created by cdl_pattern(name='all').
+        # For Engulfing, it creates CDL_ENGULFING_BULL / CDL_ENGULFING_BEAR etc.
+        # For Doji, it creates CDL_DOJI_NEUTRAL. These are already handled by confirmed check.
+        # Raw signals are useful when the TA-Lib confirmed columns are too strict.
+
+
+    # Log final pattern decision for this function call
+    if pattern_summary["pattern_name"] != "N/A":
+        log_msg = f"detect_candlestick_patterns result: Name='{pattern_summary['pattern_name']}', Type='{pattern_summary['pattern_type']}'"
+        if pattern_summary.get("pattern_detected_raw"):
+            log_msg += " (Raw Detection)"
+        elif latest_confirmed_signal.get("pattern_detected"):
+            log_msg += " (Confirmed Latest)"
+        logger.info(log_msg)
+    else:
+        logger.debug("detect_candlestick_patterns: No significant pattern detected.")
+
+    return pattern_summary
 
 def calculate_atr(df: pd.DataFrame, return_all=False):
     """Calculate Average True Range (ATR) using pandas-ta for volatility filtering."""
@@ -648,15 +555,40 @@ def check_atr_filter(df: pd.DataFrame):
         logger.error(f"Error checking ATR filter: {e}", exc_info=True)
         return False
 
-def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
-    """Main function to perform technical analysis using pandas-ta."""
-    if not kline_data_list:
-        logger.warning("analyze_technicals: Empty kline_data_list received.")
+def analyze_technicals(kline_data_list, symbol=None, interval_str=None):
+    """
+    Analyzes kline data to extract technical indicators and patterns.
+    Args:
+        kline_data_list: List of lists/tuples or pandas DataFrame with kline data (timestamp, open, high, low, close, volume).
+        symbol: The symbol being analyzed (optional, for logging/context).
+        interval_str: The interval string (optional, for logging/context).
+
+    Returns:
+        A dictionary containing technical indicators and analysis results, or None if analysis fails.
+    """
+    if interval_str is None:
+        interval_str = "N/A"
+    if symbol is None:
+        current_symbol_log = "N/A"
+    else:
+        current_symbol_log = symbol
+
+    # Convert to DataFrame if it's not already (e.g. from Kraken API)
+    if not isinstance(kline_data_list, pd.DataFrame):
+        df = pd.DataFrame(kline_data_list, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    else:
+        df = kline_data_list # It's already a DataFrame
+
+    # Ensure DataFrame is not empty
+    if df.empty:
+        logger.warning(f"[{current_symbol_log}] Empty kline data received for technical analysis.")
         return None
     
+    # Convert timestamp to datetime objects if they are not already (e.g. numeric timestamps)
+    if 'timestamp' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+    
     try:
-        df = _ensure_dataframe(kline_data_list) # Initial and only call to _ensure_dataframe
-        
         min_len_for_analysis = max(config.RSI_PERIOD, config.EMA_PERIOD, config.ATR_PERIOD, 20) + 5 # Updated to use EMA_PERIOD and include ATR_PERIOD
         if df.empty or len(df) < min_len_for_analysis:
             logger.warning(f"Insufficient data after processing in DataFrame ({len(df)} points) for full analysis. Need at least {min_len_for_analysis}.")
@@ -681,9 +613,28 @@ def analyze_technicals(kline_data_list): # Expects list of dicts from kraken_api
             logger.info("DataFrame for pattern detection is empty.")
 
         pattern_result = detect_candlestick_patterns(df, ema_series_all, volume_analysis_all)
-        
-        latest_close_price = df['close'].iloc[-1] if not df.empty and 'close' in df.columns else 0.0
 
+        # Apply ATR filter to the raw pattern_result if FILTER_PATTERNS_BY_ATR is True
+        if config.FILTER_PATTERNS_BY_ATR and pattern_result.get("pattern_detected_raw"):
+            if atr_latest > 0: # Avoid division by zero
+                # Ensure df is not empty and has high/low columns for the last candle
+                if not df.empty and 'high' in df.columns and 'low' in df.columns and len(df) > 0:
+                    candle_range = df['high'].iloc[-1] - df['low'].iloc[-1]
+                    if (candle_range / atr_latest) < config.ATR_FILTER_THRESHOLD:
+                        logger.info(f"[{current_symbol_log}] Raw pattern '{pattern_result.get('pattern_name')}' filtered out by ATR. Range/ATR: {candle_range/atr_latest:.2f} < threshold {config.ATR_FILTER_THRESHOLD:.2f}")
+                        pattern_result = {"pattern_name": "N/A (ATR Filtered)", "pattern_type": "neutral", "pattern_detected_raw": False}
+                    else:
+                        logger.info(f"[{current_symbol_log}] Raw pattern '{pattern_result.get('pattern_name')}' PASSED ATR filter. Range/ATR: {candle_range/atr_latest:.2f} >= threshold {config.ATR_FILTER_THRESHOLD:.2f}")
+                else:
+                    logger.warning(f"[{current_symbol_log}] Cannot apply ATR filter due to empty DataFrame or missing columns.")
+            else:
+                logger.warning(f"[{current_symbol_log}] ATR is 0 or invalid, cannot apply ATR filter to pattern '{pattern_result.get('pattern_name')}'.")
+        elif not config.FILTER_PATTERNS_BY_ATR and pattern_result.get("pattern_detected_raw"):
+            logger.info(f"[{current_symbol_log}] ATR filter for patterns is DISABLED. Using raw pattern: '{pattern_result.get('pattern_name')}'")
+
+
+        latest_close_price = df['close'].iloc[-1] if not df.empty and 'close' in df.columns else 0.0
+        
         technicals = {
             'latest_close': latest_close_price,
             'rsi': rsi_latest,
