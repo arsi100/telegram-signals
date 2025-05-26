@@ -486,6 +486,25 @@ def detect_candlestick_patterns(df: pd.DataFrame, ema_series: pd.Series = None, 
             else:
                 logger.warning(f"Raw engulfing column '{general_engulfing_col}' not found after cdl_pattern(name='all').")
 
+        # Add similar raw checks for Shooting Star patterns if no Hammer or Engulfing was found yet
+        if not pattern_summary["pattern_detected_raw"]:
+            raw_shootingstar_col = 'CDLSHOOTINGSTAR' # pandas-ta name from cdl_pattern(name="all")
+            if raw_shootingstar_col in df_patterns.columns:
+                for i in range(-1, -4, -1): # Check last 3 candles
+                    if len(df_patterns) < abs(i):
+                        continue
+                    raw_signal_value = df_patterns[raw_shootingstar_col].iloc[i]
+                    if raw_signal_value == -100: # Shooting Star is Bearish
+                        pattern_summary["pattern_name"] = f"Raw Shooting Star ({abs(i)})"
+                        pattern_summary["pattern_type"] = "bearish"
+                        pattern_summary["pattern_detected_raw"] = True
+                        logger.info(f"Found RAW Shooting Star on candle index {i} (from latest).")
+                        break
+                if pattern_summary["pattern_detected_raw"]:
+                    logger.debug(f"Using RAW pattern after Shooting Star check: {pattern_summary['pattern_name']}")
+            else:
+                logger.warning(f"Raw shooting star column '{raw_shootingstar_col}' not found after cdl_pattern(name='all').")
+
         # TODO: Add similar raw checks for other key patterns (e.g., Doji) if needed,
         # by inspecting the columns created by cdl_pattern(name='all').
         # For Engulfing, it creates CDL_ENGULFING_BULL / CDL_ENGULFING_BEAR etc.
