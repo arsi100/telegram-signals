@@ -355,19 +355,28 @@ def process_crypto_data(symbol: str, kline_data: pd.DataFrame, db: firestore.Cli
                     sentiment_confidence=sentiment_contribution_for_total_score, # Use the value weighted by 'sentiment_overall_contribution'
                     signal_direction=rule_based_signal_intent # Pass rule_based_signal_intent
                 )
-                # Ensure rule_based_confidence is a float for logging, 
-                # especially if get_confidence_score was mocked and might not be called as expected in some test paths.
                 log_confidence_val = rule_based_confidence if isinstance(rule_based_confidence, (int, float)) else str(rule_based_confidence)
                 logger.info(f"[{symbol}] Rule-based new signal intent: {rule_based_signal_intent}, Calculated Confidence: {log_confidence_val if isinstance(log_confidence_val, str) else f'{log_confidence_val:.4f}'}")
 
                 if should_generate_signal(confidence=rule_based_confidence, signal_type=rule_based_signal_intent):
+                    take_profit = None
+                    stop_loss = None
+                    if rule_based_signal_intent == "LONG":
+                        take_profit = latest_close * (1 + config.PROFIT_TARGET_PERCENT / 100.0)
+                        stop_loss = latest_close * (1 - config.LOSS_TARGET_PERCENT / 100.0)
+                    elif rule_based_signal_intent == "SHORT":
+                        take_profit = latest_close * (1 - config.PROFIT_TARGET_PERCENT / 100.0)
+                        stop_loss = latest_close * (1 + config.LOSS_TARGET_PERCENT / 100.0)
+                    
                     final_signal_details = {
                         "symbol": symbol, "type": rule_based_signal_intent, "price": latest_close,
                         "confidence": rule_based_confidence, "source": final_signal_source + "_NEW",
-                        "rsi": rsi, "sentiment_score": sentiment_score_for_rule_confidence,
+                        "rsi": rsi, "sentiment_score": sentiment_score_for_rule_confidence, 
                         "pattern_name": pattern_name, "volume_tier": current_volume_tier,
+                        "take_profit": take_profit,
+                        "stop_loss": stop_loss
                     }
-                    logger.info(f"[{symbol}] Rule-Based NEW Signal: Type={rule_based_signal_intent}, Price={latest_close:.2f}, Confidence={rule_based_confidence:.4f}")
+                    logger.info(f"[{symbol}] Rule-Based NEW Signal: Type={rule_based_signal_intent}, Price={latest_close:.2f}, Confidence={rule_based_confidence:.4f}, TP={take_profit:.2f}, SL={stop_loss:.2f}")
                 else:
                     logger.info(f"[{symbol}] Rule-based signal confidence {rule_based_confidence:.4f} for {rule_based_signal_intent} is below MIN_CONFIDENCE_ENTRY {config.MIN_CONFIDENCE_ENTRY}.")
         else: # This else corresponds to 'elif rule_based_signal_intent:' (and implicitly 'if open_pos:')
