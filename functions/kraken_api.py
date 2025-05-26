@@ -4,6 +4,7 @@ import datetime
 import time
 import math # Import math for timestamp calculation if needed
 from typing import Optional
+import json
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -76,49 +77,43 @@ def fetch_kline_data(symbol: str, resolution: str = "5m", limit: Optional[int] =
 
         response.raise_for_status()
         
-        data = response.json()
-        
-        # --- Data Processing Section ---
-        processed_klines = []
-        # Response contains a 'candles' key with a list of candle objects
-        if isinstance(data, dict) and 'candles' in data and isinstance(data['candles'], list):
-             raw_klines = data['candles']
-             logger.info(f"Received {len(raw_klines)} raw kline data points from Kraken API for {symbol}.")
-             for kline in raw_klines:
-                  # Check if kline is a dictionary with expected keys
-                  if isinstance(kline, dict) and all(k in kline for k in ['time', 'open', 'high', 'low', 'close', 'volume']):
-                       try:
-                            # Convert timestamp from milliseconds to seconds
-                            timestamp_sec = int(kline['time']) // 1000 
-                            
-                            processed_klines.append({
-                                 'timestamp': timestamp_sec,
-                                 'open': float(kline['open']),
-                                 'high': float(kline['high']),
-                                 'low': float(kline['low']),
-                                 'close': float(kline['close']),
-                                 # Convert volume to float to handle decimals
-                                 'volume': float(kline['volume']) 
-                            })
-                       except (ValueError, TypeError) as conv_err:
-                            logger.warning(f"Skipping kline due to conversion error: {conv_err} - Data: {kline}")
-                  else:
-                       logger.warning(f"Skipping malformed kline data point: {kline}")
-             
-             # Sort by timestamp ascending just in case API doesn't guarantee order
-             processed_klines.sort(key=lambda x: x['timestamp'])
-             
-             logger.info(f"Successfully processed {len(processed_klines)} of {len(raw_klines)} raw kline data points for {symbol}.")
-             # ---- ADDED DEBUG LOG ----
-             if processed_klines:
-                 logger.debug(f"Last processed kline for {symbol}: {processed_klines[-1]}")
-             else:
-                 logger.debug(f"Processed klines list is empty for {symbol}.")
-             return processed_klines
+        if response.status_code == 200:
+            try:
+                raw_data = response.json()
+                logger.debug(f"Kraken API response text (snippet) for {symbol}: {str(raw_data)[:200]}")
+                
+                if 'candles' not in raw_data or not isinstance(raw_data['candles'], list):
+                    logger.error(f"Kraken API response for {symbol} is missing 'candles' array or it's not a list.")
+                    return None
+
+                processed_data = []
+                for candle in raw_data['candles']:
+                    # Convert Kraken's timestamp (milliseconds) to seconds for consistency
+                    # and ensure all fields are present and correctly typed.
+                    try:
+                        processed_candle = {
+                            'timestamp': int(candle['time']) // 1000, # ms to s
+                            'open': float(candle['open']),
+                            'high': float(candle['high']),
+                            'low': float(candle['low']),
+                            'close': float(candle['close']),
+                            'volume': float(candle['volume'])
+                        }
+                        processed_data.append(processed_candle)
+                    except (KeyError, ValueError) as e:
+                        logger.warning(f"Skipping candle due to missing field or parsing error: {candle}. Error: {e}")
+                        continue
+                
+                logger.info(f"Received {len(raw_data['candles'])} raw kline data points from Kraken API for {symbol}.")
+                logger.info(f"Successfully processed {len(processed_data)} of {len(raw_data['candles'])} raw kline data points for {symbol}.")
+                if processed_data:
+                     logger.debug(f"Last processed kline for {symbol}: {processed_data[-1]}")
+                return processed_data
+            except json.JSONDecodeError:
+                logger.error(f"Failed to decode JSON response from Kraken for {symbol}. Response: {response.text}")
         else:
              logger.error(f"Unexpected response structure from Kraken API for {symbol}. 'candles' key missing or not a list. Full Response: {response.text}")
              return None
-        # --- End Data Processing Section ---
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching Kraken Kline data for {symbol}: {e}")

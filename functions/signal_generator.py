@@ -237,176 +237,132 @@ def process_crypto_data(symbol: str, kline_data: pd.DataFrame, db: firestore.Cli
     # Decide if Gemini's signal will be used
     use_gemini_signal = False
     if config.ENABLE_GEMINI_ANALYSIS and gemini_analysis_result and isinstance(gemini_analysis_result, dict):
-        gemini_signal_type = gemini_analysis_result.get("signal_type", "").upper()
-        gemini_confidence = float(gemini_analysis_result.get("confidence", 0.0))
+        gemini_signal_type = gemini_analysis_result.get("signal_type", "").upper() # Ensure it's upper for reliable comparison
+        gemini_confidence_raw = gemini_analysis_result.get("confidence", 0.0) # Raw confidence from Gemini (0-1 or 0-100)
+        gemini_confidence_scaled = gemini_confidence_raw * 100 if gemini_confidence_raw <= 1.0 else gemini_confidence_raw
+
+        gemini_rationale = gemini_analysis_result.get("rationale", "N/A")
+        gemini_price_targets = gemini_analysis_result.get("price_targets", {}) # Grok's addition
         
+        logger.debug(f"[{symbol}] Gemini Raw Output: Type='{gemini_signal_type}', ConfRaw={gemini_confidence_raw}, ConfScaled={gemini_confidence_scaled:.2f}, Targets={gemini_price_targets}")
+
         if gemini_signal_type in ["LONG", "SHORT", "EXIT_LONG", "EXIT_SHORT", "EXIT"] and \
-           gemini_confidence >= config.GEMINI_CONFIDENCE_THRESHOLD_TO_OVERRIDE:
+           gemini_confidence_raw >= config.GEMINI_CONFIDENCE_THRESHOLD_TO_OVERRIDE: # Compare raw 0-1 confidence from Gemini
             use_gemini_signal = True
             final_signal_source = "GEMINI_AI"
-            logger.info(f"[{symbol}] Gemini signal '{gemini_signal_type}' (conf: {gemini_confidence:.2f}) meets override threshold {config.GEMINI_CONFIDENCE_THRESHOLD_TO_OVERRIDE}. Will use Gemini signal.")
-        elif gemini_signal_type in ["LONG", "SHORT", "EXIT_LONG", "EXIT_SHORT", "EXIT"]:
-             logger.info(f"[{symbol}] Gemini signal '{gemini_signal_type}' (conf: {gemini_confidence:.2f}) is below override threshold {config.GEMINI_CONFIDENCE_THRESHOLD_TO_OVERRIDE}. Evaluating rule-based signal.")
-        else: # NEUTRAL or missing/invalid signal type
-            logger.info(f"[{symbol}] Gemini signal is '{gemini_signal_type}' (conf: {gemini_confidence:.2f}) or invalid. Evaluating rule-based signal.")
+            logger.info(f"[{symbol}] Gemini signal '{gemini_signal_type}' (raw conf: {gemini_confidence_raw:.2f}) meets override threshold {config.GEMINI_CONFIDENCE_THRESHOLD_TO_OVERRIDE}. Will use Gemini signal.")
+            
+            if gemini_signal_type in ["LONG", "EXIT_SHORT"]:
+                # Corrected constant names to match config.py
+                default_tp = latest_close * (1 + config.PROFIT_TARGET_PERCENT / 100)
+                default_sl = latest_close * (1 - config.LOSS_TARGET_PERCENT / 100)
+            elif gemini_signal_type in ["SHORT", "EXIT_LONG"]:
+                # Corrected constant names to match config.py
+                default_tp = latest_close * (1 - config.PROFIT_TARGET_PERCENT / 100)
+                default_sl = latest_close * (1 + config.LOSS_TARGET_PERCENT / 100)
+            else: 
+                default_tp = None
+                default_sl = None
 
-    if use_gemini_signal:
-        signal_intent = gemini_analysis_result.get("signal_type").upper() # LONG, SHORT, EXIT, EXIT_LONG, EXIT_SHORT
-        # Map simple "EXIT" from Gemini to specific EXIT_LONG/EXIT_SHORT if a position is open
-        if signal_intent == "EXIT" and open_pos:
-            signal_intent = f"EXIT_{open_pos['type']}"
-        elif signal_intent == "EXIT" and not open_pos:
-            logger.warning(f"[{symbol}] Gemini suggested EXIT but no open position found. Treating as NEUTRAL.")
-            signal_intent = "NEUTRAL" # Or handle as an error/ignore
-
-        if signal_intent != "NEUTRAL":
-            final_confidence = float(gemini_analysis_result.get("confidence", 0.0)) * 100.0 # SCALED HERE
+            take_profit = gemini_price_targets.get("take_profit", default_tp)
+            stop_loss = gemini_price_targets.get("stop_loss", default_sl)
+            
             final_signal_details = {
-                "symbol": symbol, "type": signal_intent, "price": latest_close, 
-                "confidence": final_confidence, "source": final_signal_source,
-                "rsi": rsi, "sentiment_score_raw": raw_sentiment_score, # Log raw sentiment used by Gemini
-                "pattern_name": pattern_name, "volume_tier": volume_analysis.get('volume_tier', 'UNKNOWN'),
-                "gemini_rationale": gemini_analysis_result.get("rationale", []),
-                "gemini_price_targets": gemini_analysis_result.get("price_targets"),
-                "gemini_position_size_pct": gemini_analysis_result.get("position_size_pct")
+                "signal_type": gemini_signal_type,
+                "price": latest_close,
+                "confidence_score": gemini_confidence_scaled,
+                "source": final_signal_source,
+                "reasoning": gemini_rationale,
+                "take_profit": take_profit,
+                "stop_loss": stop_loss,
+                "rsi": rsi, 
+                "sentiment_score_raw": raw_sentiment_score,
+                "pattern_name": pattern_name if pattern_name != "N/A" else "N/A",
+                "volume_tier": volume_analysis.get('volume_tier', 'UNKNOWN'),
+                "rule_based_intent": rule_based_signal_intent
             }
-            if open_pos and "EXIT" in signal_intent:
-                final_signal_details["original_position_id"] = open_pos['id']
-            logger.info(f"[{symbol}] Using Gemini Signal: Type={signal_intent}, Price={latest_close:.2f}, Confidence={final_confidence:.4f}")
-        else: # Gemini said NEUTRAL or EXIT on no position
-             logger.info(f"[{symbol}] Gemini suggested NEUTRAL or unfulfillable EXIT. No Gemini signal generated.")
+            logger.info(f"[{symbol}] Using Gemini signal: {final_signal_details}")
 
+        elif gemini_signal_type in ["LONG", "SHORT", "EXIT_LONG", "EXIT_SHORT", "EXIT"]:
+             logger.info(f"[{symbol}] Gemini signal '{gemini_signal_type}' (raw conf: {gemini_confidence_raw:.2f}) is Present BUT below override threshold {config.GEMINI_CONFIDENCE_THRESHOLD_TO_OVERRIDE}. Evaluating rule-based signal.")
+        else: 
+            logger.info(f"[{symbol}] Gemini signal is '{gemini_signal_type}' (conf: {gemini_confidence_raw:.2f}) or invalid. Evaluating rule-based signal.")
 
-    # Fallback to rule-based logic or if Gemini signal is not used / not actionable
-    if not final_signal_details: # Covers cases where Gemini is off, failed, or its signal wasn't used
-        logger.info(f"[{symbol}] Using rule-based signal logic. Preliminary intent: {rule_based_signal_intent}")
-        final_signal_source = "RULE_BASED" # Ensure source is rule-based if we reach here
+    # --- Rule-Based Signal Generation (if Gemini not used or below threshold) ---
+    if not use_gemini_signal and rule_based_signal_intent:
+        logger.info(f"[{symbol}] Proceeding with rule-based signal intent: {rule_based_signal_intent}.")
         
+        current_confidence_score = get_confidence_score(
+            tech_results=technicals, # Pass the entire technicals dictionary
+            sentiment_confidence=sentiment_score_for_rule_confidence, # Pass the calculated sentiment score
+            signal_direction=rule_based_signal_intent # Pass the determined signal intent ("LONG" or "SHORT")
+        )
+        logger.info(f"[{symbol}] Rule-based '{rule_based_signal_intent}' confidence score: {current_confidence_score:.2f}")
+
+        # Initialize rule_based_tp and rule_based_sl before they are potentially assigned
+        rule_based_tp = None
+        rule_based_sl = None
+
+        if rule_based_signal_intent == "LONG":
+            rule_based_tp = latest_close * (1 + config.PROFIT_TARGET_PERCENT / 100)
+            rule_based_sl = latest_close * (1 - config.LOSS_TARGET_PERCENT / 100)
+        elif rule_based_signal_intent == "SHORT":
+            rule_based_tp = latest_close * (1 - config.PROFIT_TARGET_PERCENT / 100)
+            rule_based_sl = latest_close * (1 + config.LOSS_TARGET_PERCENT / 100)
+
+        final_signal_type_for_rule = rule_based_signal_intent # Initialize with the intent
+
         if open_pos:
-            logger.info(f"[{symbol}] Rule-based: Open position ({open_pos['type']}) found. Evaluating for EXIT.")
-            exit_signal_intent = None
-            if open_pos['type'] == 'LONG':
-                if ((pattern_type == "bearish" and sentiment_score_for_rule_confidence <= config.SENTIMENT_THRESHOLD_EXIT_STRONG_NEGATIVE) or 
-                   (rsi >= config.RSI_OVERBOUGHT_THRESHOLD - config.RSI_NEUTRAL_ZONE_BUFFER and sentiment_score_for_rule_confidence < config.SENTIMENT_THRESHOLD_EXIT_NEGATIVE)):
-                    exit_signal_intent = "EXIT_LONG"
-            elif open_pos['type'] == 'SHORT':
-                if ((pattern_type == "bullish" and sentiment_score_for_rule_confidence >= config.SENTIMENT_THRESHOLD_EXIT_STRONG_POSITIVE) or 
-                   (rsi <= config.RSI_OVERSOLD_THRESHOLD + config.RSI_NEUTRAL_ZONE_BUFFER and sentiment_score_for_rule_confidence > config.SENTIMENT_THRESHOLD_EXIT_POSITIVE)):
-                    exit_signal_intent = "EXIT_SHORT"
-
-            if exit_signal_intent:
-                # Use the pre-weighted sentiment contribution from sentiment_analysis.py
-                sentiment_contribution_for_total_score = sentiment_data_dict.get('sentiment_confidence_final_RULE_WEIGHTED', 0.0)
-                logger.debug(f"[{symbol}] For EXIT intent {exit_signal_intent}, using sentiment_confidence_final_RULE_WEIGHTED: {sentiment_contribution_for_total_score:.4f}")
-
-                rule_based_confidence = get_confidence_score(
-                    tech_results=technicals, # Pass the whole technicals dict
-                    sentiment_confidence=sentiment_contribution_for_total_score, # Use the value weighted by 'sentiment_overall_contribution'
-                    signal_direction=exit_signal_intent # Pass exit_signal_intent
-                )
-                final_signal_details = {
-                    "symbol": symbol, "type": exit_signal_intent, "price": latest_close, 
-                    "confidence": rule_based_confidence, "source": final_signal_source + "_EXIT",
-                    "rsi": rsi, "sentiment_score": sentiment_score_for_rule_confidence, 
-                    "pattern_name": pattern_name, "volume_tier": volume_analysis.get('volume_tier', 'UNKNOWN'),
-                    "original_position_id": open_pos['id']
-                }
-                logger.info(f"[{symbol}] Rule-Based EXIT Signal: Type={exit_signal_intent}, Price={latest_close:.2f}, Confidence={rule_based_confidence:.4f}")
-            else: # This else corresponds to 'if exit_signal_intent:'
-                logger.info(f"[{symbol}] Rule-based: No EXIT condition met for open {open_pos['type']} position.")
+            logger.info(f"[{symbol}] Open position exists: {open_pos['type']}. Rule-based intent: {rule_based_signal_intent}.")
+            if (open_pos['type'] == "LONG" and rule_based_signal_intent == "SHORT") or \
+               (open_pos['type'] == "SHORT" and rule_based_signal_intent == "LONG"):
+                final_signal_type_for_rule = f"EXIT_{open_pos['type']}"
+                logger.info(f"[{symbol}] Rule-based intent {rule_based_signal_intent} suggests exiting existing {open_pos['type']} position. Final type: {final_signal_type_for_rule}")
+                rule_based_tp = None 
+                rule_based_sl = None 
+            else:
+                logger.info(f"[{symbol}] Rule-based intent '{rule_based_signal_intent}' matches or is not opposite to open position '{open_pos['type']}'. No rule-based entry/exit signal generated by this logic block.")
+                rule_based_signal_intent = None 
         
-        elif rule_based_signal_intent: # Rule-based LONG or SHORT intent for NEW position; this elif corresponds to 'if open_pos:'
-            logger.debug(f"[SG_DEBUG_RULES] {symbol}: Evaluating NEW rule-based position for intent: {rule_based_signal_intent}")
-            current_volume_tier = volume_analysis.get('volume_tier', 'UNKNOWN')
-            
-            # Refined volume_tier_ok logic for Step 2
-            volume_tier_ok = current_volume_tier not in ['UNKNOWN'] and (
-                current_volume_tier != 'VERY_LOW' or
-                (current_volume_tier == 'VERY_LOW' and (
-                    # Allow VERY_LOW if RSI is strong for the intent direction AND price confirms trend vs EMA
-                    (rsi > config.RSI_OVERBOUGHT_THRESHOLD and latest_close > ema and rule_based_signal_intent == "LONG") or 
-                    (rsi < config.RSI_OVERSOLD_THRESHOLD and latest_close < ema and rule_based_signal_intent == "SHORT")
-                ))
-            )
-            
-            late_warning = volume_analysis.get('late_entry_warning', False)
-            
-            sentiment_aligned_for_rule = False
-            if rule_based_signal_intent == "LONG":
-                sentiment_aligned_for_rule = sentiment_score_for_rule_confidence >= config.SENTIMENT_THRESHOLD_NEUTRAL 
-            elif rule_based_signal_intent == "SHORT":
-                sentiment_aligned_for_rule = sentiment_score_for_rule_confidence <= config.SENTIMENT_THRESHOLD_FOR_RSI_SHORT
-            
-            logger.debug(f"[SG_DEBUG_RULES] {symbol}: Checks for NEW rule-based {rule_based_signal_intent}: Vol Tier='{current_volume_tier}'(OK={volume_tier_ok}), Sent Aligned={sentiment_aligned_for_rule}(Score={sentiment_score_for_rule_confidence:.2f}), Late Warn={late_warning}")
+        # Call should_generate_signal with confidence and the determined signal type (e.g., LONG, SHORT, EXIT_LONG)
+        if rule_based_signal_intent and should_generate_signal(current_confidence_score, final_signal_type_for_rule):
+            final_signal_details = {
+                "signal_type": final_signal_type_for_rule,
+                "price": latest_close,
+                "confidence_score": current_confidence_score,
+                "source": "RULE_BASED",
+                "rsi": rsi,
+                "sentiment_score_adjusted": sentiment_score_for_rule_confidence,
+                "sentiment_score_raw": raw_sentiment_score,
+                "pattern_name": pattern_name if pattern_name != "N/A" else "N/A",
+                "pattern_type": pattern_type if pattern_type != "neutral" else "N/A",
+                "volume_tier": technicals.get('volume_analysis', {}).get('volume_tier', 'UNKNOWN'),
+                "primary_trend": technicals.get('primary_trend', 'UNKNOWN'),
+                "take_profit": rule_based_tp,
+                "stop_loss": rule_based_sl
+            }
+            # Add reason_for_exit if it's an exit signal
+            if final_signal_type_for_rule.startswith("EXIT_"):
+                final_signal_details["reason_for_exit"] = "Rule-based exit criteria met."
+                logger.info(f"[{symbol}] Generating RULE-BASED EXIT signal: {final_signal_details}")
+            else:
+                logger.info(f"[{symbol}] Generating RULE-BASED ENTRY signal: {final_signal_details}")
+        else:
+            # This block is entered if rule_based_signal_intent was None OR should_generate_signal returned False
+            if rule_based_signal_intent: # Log only if there was an intent but it didn't pass confidence
+                logger.info(f"[{symbol}] Rule-based signal type '{final_signal_type_for_rule}' (original intent: {rule_based_signal_intent}, context: {open_pos['type'] if open_pos else 'new'}) with confidence {current_confidence_score:.2f} did NOT meet threshold via should_generate_signal. No rule-based signal generated.")
+            # If rule_based_signal_intent was None initially, it means basic criteria (pattern/RSI + sentiment) were not met to even form an intent.
+            # This case is implicitly handled as final_signal_details remains None.
 
-            is_late = config.AVOID_LATE_ENTRIES and late_warning
-            logger.info(f"[{symbol}] generate_signal_from_intent PRE-CHECK: intent={rule_based_signal_intent}, is_sentiment_aligned={sentiment_aligned_for_rule}, is_volume_sufficient={volume_tier_ok}, is_late={is_late} (config.AVOID_LATE_ENTRIES={config.AVOID_LATE_ENTRIES})")
-
-            if not (sentiment_aligned_for_rule and volume_tier_ok and not is_late):
-                logger.info(f"[{symbol}] Conditions for rule-based NEW {rule_based_signal_intent} signal not met (Sentiment Align: {sentiment_aligned_for_rule}, Volume Suff: {volume_tier_ok}, Not Late: {not is_late}).")
-                # Removed erroneous return None here; if conditions not met, it will fall through to the end and return None if final_signal_details is still None
-            else: # Conditions ARE met for a new rule-based signal
-                # Use the pre-weighted sentiment contribution from sentiment_analysis.py
-                sentiment_contribution_for_total_score = sentiment_data_dict.get('sentiment_confidence_final_RULE_WEIGHTED', 0.0)
-                logger.debug(f"[{symbol}] For NEW intent {rule_based_signal_intent}, using sentiment_confidence_final_RULE_WEIGHTED: {sentiment_contribution_for_total_score:.4f}")
-                
-                rule_based_confidence = get_confidence_score(
-                    tech_results=technicals, # Pass the whole technicals dict
-                    sentiment_confidence=sentiment_contribution_for_total_score, # Use the value weighted by 'sentiment_overall_contribution'
-                    signal_direction=rule_based_signal_intent # Pass rule_based_signal_intent
-                )
-                log_confidence_val = rule_based_confidence if isinstance(rule_based_confidence, (int, float)) else str(rule_based_confidence)
-                logger.info(f"[{symbol}] Rule-based new signal intent: {rule_based_signal_intent}, Calculated Confidence: {log_confidence_val if isinstance(log_confidence_val, str) else f'{log_confidence_val:.4f}'}")
-
-                if should_generate_signal(confidence=rule_based_confidence, signal_type=rule_based_signal_intent):
-                    take_profit = None
-                    stop_loss = None
-                    if rule_based_signal_intent == "LONG":
-                        take_profit = latest_close * (1 + config.PROFIT_TARGET_PERCENT / 100.0)
-                        stop_loss = latest_close * (1 - config.LOSS_TARGET_PERCENT / 100.0)
-                    elif rule_based_signal_intent == "SHORT":
-                        take_profit = latest_close * (1 - config.PROFIT_TARGET_PERCENT / 100.0)
-                        stop_loss = latest_close * (1 + config.LOSS_TARGET_PERCENT / 100.0)
-                    
-                    final_signal_details = {
-                        "symbol": symbol, "type": rule_based_signal_intent, "price": latest_close,
-                        "confidence": rule_based_confidence, "source": final_signal_source + "_NEW",
-                        "rsi": rsi, "sentiment_score": sentiment_score_for_rule_confidence, 
-                        "pattern_name": pattern_name, "volume_tier": current_volume_tier,
-                        "take_profit": take_profit,
-                        "stop_loss": stop_loss
-                    }
-                    logger.info(f"[{symbol}] Rule-Based NEW Signal: Type={rule_based_signal_intent}, Price={latest_close:.2f}, Confidence={rule_based_confidence:.4f}, TP={take_profit:.2f}, SL={stop_loss:.2f}")
-                else:
-                    logger.info(f"[{symbol}] Rule-based signal confidence {rule_based_confidence:.4f} for {rule_based_signal_intent} is below MIN_CONFIDENCE_ENTRY {config.MIN_CONFIDENCE_ENTRY}.")
-        else: # This else corresponds to 'elif rule_based_signal_intent:' (and implicitly 'if open_pos:')
-            logger.info(f"[{symbol}] No rule-based signal intent determined (pattern or RSI/Sentiment) and no open position for EXIT.")
-
-    # --- Final Signal Output ---
-    # Grok Step 3: Logging for exit signal confidence check validation
+    # --- Final Signal Processing & Return ---
     if final_signal_details:
-        log_signal_type = final_signal_details.get("type", "UNKNOWN_TYPE")
-        log_confidence = final_signal_details.get("confidence", 0.0)
-        log_required_threshold = config.MIN_CONFIDENCE_EXIT if "EXIT" in log_signal_type else config.MIN_CONFIDENCE_ENTRY
-        logger.debug(f"[{symbol}] Final check PRE-should_generate_signal: Signal={log_signal_type}, Conf={log_confidence:.2f}, ReqThreshold={log_required_threshold:.2f}, Source={final_signal_details.get('source')}")
-
-    if final_signal_details and should_generate_signal(confidence=final_signal_details.get("confidence", 0.0), signal_type=final_signal_details.get("type")):
-        # Ensure essential fields from Gemini are carried over if it was the source
-        if final_signal_details.get("source") == "GEMINI_AI" and gemini_analysis_result:
-            final_signal_details["gemini_rationale"] = gemini_analysis_result.get("rationale", [])
-            final_signal_details["gemini_price_targets"] = gemini_analysis_result.get("price_targets")
-            final_signal_details["gemini_position_size_pct"] = gemini_analysis_result.get("position_size_pct")
+        final_signal_details['symbol'] = symbol 
+        final_signal_details['latest_kline_timestamp_utc'] = technicals.get('latest_timestamp').isoformat() if technicals.get('latest_timestamp') else datetime.datetime.now(pytz.utc).isoformat()
         
-        logger.info(f"[{symbol}] Final signal generated ({final_signal_details.get('source')}): {final_signal_details.get('type')} with conf {final_signal_details.get('confidence'):.4f}")
+        logger.info(f"[{symbol}] Final signal generated: Type={final_signal_details['signal_type']}, Price={final_signal_details['price']}, Conf={final_signal_details['confidence_score']:.2f}, Source={final_signal_details['source']}")
         return final_signal_details
-    elif final_signal_details: 
-        # Log still needs to be more informative about which threshold was missed
-        signal_type_for_log = final_signal_details.get("type", "UNKNOWN_TYPE")
-        required_conf_for_log = config.MIN_CONFIDENCE_EXIT if "EXIT" in signal_type_for_log else config.MIN_CONFIDENCE_ENTRY
-        logger.info(f"[{symbol}] Final signal ({final_signal_details.get('source')}) for {signal_type_for_log} with confidence {final_signal_details.get('confidence', 0):.4f} was below required threshold {required_conf_for_log:.2f}. No signal.")
-        return None
     else:
-        logger.info(f"[{symbol}] No actionable signal generated (neither Gemini nor rule-based met criteria).")
+        logger.info(f"[{symbol}] No signal generated after all checks (Gemini and Rule-based).")
         return None
 
 def is_sentiment_aligned_for_signal(score: float, intent: str, config_module) -> bool:

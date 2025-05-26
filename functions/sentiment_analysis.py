@@ -80,71 +80,102 @@ class LunarCrushAPI:
             logger.error(f"Unexpected error in LunarCrush API call for {symbol} to {url}: {e}")
             return None
 
-def get_sentiment_score(symbol: str) -> Tuple[float, Dict]:
+def get_sentiment_score(symbol: str) -> Dict:
     """
     Get sentiment score and metrics for a trading symbol.
     Adapting to LunarCrush API v4 which may not directly provide 'average_sentiment_score'.
+    Handles API errors by returning a dictionary with a neutral score and status if configured.
+    NOW ALWAYS RETURNS A DICTIONARY.
     """
     if not config.SENTIMENT_ANALYSIS_ENABLED:
-        return 0.0, {}
+        return {
+            'sentiment_score_raw': 0.0, 
+            'status': 'SENTIMENT_DISABLED', 
+            'galaxy_score_used': None,
+            'sentiment_confidence_final_RULE_WEIGHTED': 0.0,
+            'sentiment_confidence_final': 0.0
+        }
         
     try:
-        # Map trading symbol to LunarCrush symbol
         lunarcrush_symbol = config.LUNARCRUSH_SYMBOL_MAP.get(symbol)
         if not lunarcrush_symbol:
             logger.warning(f"No LunarCrush symbol mapping for {symbol}")
-            return 0.0, {}
+            result_dict = {
+                'sentiment_score_raw': config.NEUTRAL_SENTIMENT_SCORE_ON_ERROR if config.USE_NEUTRAL_SENTIMENT_ON_ERROR else 0.0,
+                'status': 'NO_MAPPING', 
+                'galaxy_score_used': None,
+                'sentiment_confidence_final_RULE_WEIGHTED': 0.0,
+                'sentiment_confidence_final': 0.0
+            }
+            if config.USE_NEUTRAL_SENTIMENT_ON_ERROR:
+                 logger.warning(f"Defaulting to neutral sentiment score {result_dict['sentiment_score_raw']} for {symbol} due to missing mapping.")
+            return result_dict
             
-        # Initialize API client (will use the updated BASE_URL)
         api = LunarCrushAPI(config.LUNARCRUSH_API_KEY)
+        metrics = api.get_coin_metrics(lunarcrush_symbol) # This is a dict or None
         
-        # Get metrics (raw JSON from api4/.../v1 if successful)
-        metrics = api.get_coin_metrics(lunarcrush_symbol)
+        # Initialize result_dict with a base structure, including keys expected by signal_generator
+        result_dict = {
+            'sentiment_score_raw': config.NEUTRAL_SENTIMENT_SCORE_ON_ERROR if config.USE_NEUTRAL_SENTIMENT_ON_ERROR else 0.0,
+            'status': 'INIT',
+            'galaxy_score_used': None,
+            'sentiment_confidence_final_RULE_WEIGHTED': 0.0,
+            'sentiment_confidence_final': 0.0
+        }
         
-        if not metrics:
-            return 0.0, {}
+        if metrics: # If api.get_coin_metrics returned a dictionary
+            result_dict.update(metrics) # Add all metrics from LC (galaxy_score, alt_rank etc.)
+            result_dict['status'] = 'METRICS_RECEIVED'
+        else:
+            logger.warning(f"Failed to fetch metrics for {lunarcrush_symbol} from LunarCrush.")
+            result_dict['status'] = 'API_ERROR'
+            if config.USE_NEUTRAL_SENTIMENT_ON_ERROR:
+                logger.warning(f"Defaulting to neutral sentiment score {result_dict['sentiment_score_raw']} for {symbol} due to API error.")
+            # result_dict already has neutral score from initialization
+            return result_dict 
             
-        # --- Sentiment Calculation Adjustment for v4 ---
-        # 'average_sentiment_score' is missing from the current v4 endpoint.
-        # We will use 'galaxy_score' as a proxy for now. Galaxy Score is 0-100.
-        # Let's normalize Galaxy Score to a -1 to 1 range.
-        # Assuming 50 is neutral, <50 bearish, >50 bullish.
-        # (This is a guess and might need refinement based on Galaxy Score behavior)
-        
-        galaxy_score = metrics.get('galaxy_score')
-        sentiment_score = 0.0 # Default to neutral
+        galaxy_score = result_dict.get('galaxy_score') # Use .get() from result_dict after potential update
+        sentiment_score_calculated = result_dict['sentiment_score_raw'] # Keep current default or override below
 
         if galaxy_score is not None:
             # Normalize galaxy_score (0-100) to sentiment_score (-1 to 1)
-            # Treat 0-40 as bearish (-1 to -0.2), 40-60 as neutral (-0.2 to 0.2), 60-100 as bullish (0.2 to 1)
             if galaxy_score < 40:
-                sentiment_score = -1.0 + ((galaxy_score / 40.0) * 0.8) # Scales 0-39 to -1.0 to -0.2
+                sentiment_score_calculated = -1.0 + ((galaxy_score / 40.0) * 0.8)
             elif galaxy_score > 60:
-                sentiment_score = 0.2 + (((galaxy_score - 60) / 40.0) * 0.8) # Scales 61-100 to 0.2 to 1.0
+                sentiment_score_calculated = 0.2 + (((galaxy_score - 60) / 40.0) * 0.8)
             else: # Between 40 and 60 (inclusive)
-                sentiment_score = -0.2 + (((galaxy_score - 40) / 20.0) * 0.4) # Scales 40-60 to -0.2 to 0.2
-            sentiment_score = round(max(-1.0, min(1.0, sentiment_score)), 4) # Ensure it's clamped and rounded
-            logger.info(f"Using Galaxy Score {galaxy_score} to derive sentiment_score: {sentiment_score} for {lunarcrush_symbol}")
+                sentiment_score_calculated = -0.2 + (((galaxy_score - 40) / 20.0) * 0.4)
+            sentiment_score_calculated = round(max(-1.0, min(1.0, sentiment_score_calculated)), 4)
+            logger.info(f"Using Galaxy Score {galaxy_score} to derive sentiment_score: {sentiment_score_calculated} for {lunarcrush_symbol}")
+            result_dict['status'] = 'GS_PROCESSED'
         else:
-            logger.warning(f"Galaxy Score is None for {lunarcrush_symbol}. Defaulting sentiment to neutral (0.0).")
-            # Fallback to old ASS if by some miracle it was populated (it won't be with current parsing)
-            # ass = metrics['average_sentiment_score'] # This will be the default 3.0
-            # if ass >= config.SENTIMENT_THRESHOLD_BULLISH: sentiment_score = 1.0
-            # elif ass <= config.SENTIMENT_THRESHOLD_BEARISH: sentiment_score = -1.0
-            # else: sentiment_score = (ass - 3.0) / (config.SENTIMENT_THRESHOLD_BULLISH - 3.0)
+            logger.warning(f"Galaxy Score is None for {lunarcrush_symbol} from metrics: {metrics}. Defaulting sentiment to current raw score: {sentiment_score_calculated}.")
+            result_dict['status'] = 'GS_MISSING'
+        
+        result_dict['sentiment_score_raw'] = sentiment_score_calculated # Update with calculated score
+        result_dict['galaxy_score_used'] = galaxy_score # Ensure this is explicitly set from the var used
 
-        # 'social_volume_change_24h' is missing. Social volume bonus cannot be applied.
-        if metrics.get('social_volume_change_24h', 0) == 0 and metrics.get('social_volume', 0) == 0:
-             logger.info(f"Social volume data missing for {lunarcrush_symbol}, skipping social volume bonus.")
-        # else:
-        #    if metrics['social_volume_change_24h'] > config.SOCIAL_VOLUME_MULTIPLIER:
-        #        sentiment_score *= 1.1 
-            
-        return sentiment_score, metrics
+        sentiment_overall_weight_from_config = config.CONFIDENCE_WEIGHTS.get('sentiment_overall_contribution', 0.05)
+        logger.debug(f"[SENTIMENT_DEBUG] For {lunarcrush_symbol}: Value of config.CONFIDENCE_WEIGHTS['sentiment_overall_contribution'] being used for rule-weighted conf: {sentiment_overall_weight_from_config}")
+        result_dict['sentiment_confidence_final_RULE_WEIGHTED'] = result_dict['sentiment_score_raw'] * sentiment_overall_weight_from_config
+        result_dict['sentiment_confidence_final'] = result_dict['sentiment_score_raw'] * config.SENTIMENT_WEIGHT_FOR_RULES
+
+        logger.info(f"[{lunarcrush_symbol}] Sentiment analysis: Status={result_dict['status']}, Raw score={result_dict['sentiment_score_raw']:.3f} (GS {result_dict.get('galaxy_score_used', 'N/A')}), RuleConf={result_dict['sentiment_confidence_final_RULE_WEIGHTED']:.3f}")
+        return result_dict
         
     except Exception as e:
-        logger.error(f"Error in sentiment analysis for {symbol}: {e}")
-        return 0.0, {}
+        logger.error(f"Error in sentiment analysis for {symbol}: {e}", exc_info=True)
+        final_error_result_dict = {
+            'sentiment_score_raw': config.NEUTRAL_SENTIMENT_SCORE_ON_ERROR if config.USE_NEUTRAL_SENTIMENT_ON_ERROR else 0.0,
+            'status': 'EXCEPTION_IN_GET_SENTIMENT_SCORE', 
+            'galaxy_score_used': None,
+            'error_message': str(e),
+            'sentiment_confidence_final_RULE_WEIGHTED': 0.0,
+            'sentiment_confidence_final': 0.0
+        }
+        if config.USE_NEUTRAL_SENTIMENT_ON_ERROR:
+            logger.warning(f"Defaulting to neutral sentiment score {final_error_result_dict['sentiment_score_raw']} for {symbol} due to unexpected exception.")
+        return final_error_result_dict
 
 def get_sentiment_confidence(sentiment_score: float, metrics: Dict) -> float:
     """
@@ -255,42 +286,53 @@ def _get_social_sentiment(symbol):
     Placeholder implementation - would integrate with social sentiment APIs.
     """
     try:
-        # Placeholder logic - in production would call social sentiment APIs
-        # For now, return neutral sentiment
-        return 0.0
-        
+        # Placeholder logic
+        return 0.0 # Neutral
     except Exception as e:
         logger.error(f"Error getting social sentiment for {symbol}: {e}")
         return None
 
-def calculate_directional_sentiment_adjustment(symbol, signal_direction):
+def calculate_directional_sentiment_adjustment(
+    raw_score: float, 
+    signal_direction: str, 
+    multiplier: float = 1.0, 
+    cap: Optional[float] = None
+) -> float:
     """
-    Get sentiment score for signal direction.
-    Returns score between 0-15 based on sentiment alignment.
+    Adjusts a raw sentiment score based on the intended signal direction,
+    applying a multiplier and a cap.
+
+    Args:
+        raw_score: The initial sentiment score.
+        signal_direction: "LONG" or "SHORT".
+        multiplier: Factor to multiply the score by.
+        cap: Absolute maximum/minimum value for the adjusted score based on direction.
+             For LONG, it's a positive cap. For SHORT, it's a negative cap.
+
+    Returns:
+        The adjusted sentiment score.
     """
-    try:
-        sentiment_result = get_crypto_sentiment(symbol)
-        sentiment_score = sentiment_result["sentiment_score"]
-        sentiment_label = sentiment_result["sentiment_label"]
-        
-        # Calculate score based on alignment with signal direction
-        if signal_direction.upper() == "LONG":
-            if sentiment_label == "bullish":
-                return 15  # Full score for bullish sentiment on long signal
-            elif sentiment_label == "neutral":
-                return 8   # Partial score for neutral sentiment
-            else:  # bearish
-                return 0   # No score for bearish sentiment on long signal
-        elif signal_direction.upper() == "SHORT":
-            if sentiment_label == "bearish":
-                return 15  # Full score for bearish sentiment on short signal
-            elif sentiment_label == "neutral":
-                return 8   # Partial score for neutral sentiment
-            else:  # bullish
-                return 0   # No score for bullish sentiment on short signal
-        else:
-            return 5  # Default neutral score
-            
-    except Exception as e:
-        logger.error(f"Error getting sentiment score for {symbol}: {e}")
-        return 5  # Default neutral score 
+    if raw_score is None: # Should not happen if called correctly, but as a safeguard
+        return 0.0
+
+    adjusted_score = raw_score * multiplier
+
+    if cap is not None:
+        if signal_direction == "LONG":
+            adjusted_score = min(adjusted_score, cap)
+        elif signal_direction == "SHORT":
+            # Assuming cap for SHORT is a negative value (e.g., -1.0)
+            # and raw_score * multiplier would be negative.
+            adjusted_score = max(adjusted_score, cap) # max of two negative numbers is the one closer to zero
+    
+    # Further clamping to ensure score remains within a logical global range if necessary (e.g. -1 to 1)
+    # This depends on overall system design for sentiment scores.
+    # For now, the directional cap is primary.
+    # Example global clamp: adjusted_score = max(-1.0, min(1.0, adjusted_score))
+    
+    return round(adjusted_score, 4)
+
+# Ensure any old test/example blocks for this module are updated or removed if they call old signatures
+# Example usage (illustrative):
+# adjusted_long = calculate_directional_sentiment_adjustment(0.6, "LONG", 1.1, 1.0) -> 0.66
+# adjusted_short = calculate_directional_sentiment_adjustment(-0.5, "SHORT", 1.2, -1.0) -> -0.6 

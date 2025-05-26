@@ -7,6 +7,9 @@ import logging
 import os
 import sys
 from telegram import Bot
+import json
+import traceback
+from flask import jsonify # Flask is available in GCP Cloud Functions Python runtime
 
 # Suppress pandas warnings to reduce log noise
 import warnings
@@ -58,10 +61,11 @@ db = None
 try:
     import firebase_admin
     from firebase_admin import credentials, firestore
+    import pandas as pd # Add pandas import
     from . import config
     from .kraken_api import fetch_kline_data
     from .technical_analysis import analyze_technicals
-    from .position_manager import get_open_position, save_position, update_position, close_position, record_signal_ts
+    from .position_manager import get_open_position, record_new_position, update_avg_down_position, close_open_position, record_signal_ts
     from .telegram_bot import send_telegram_message
     from .confidence_calculator import get_confidence_score
     from .signal_generator import process_crypto_data
@@ -130,13 +134,23 @@ def run_signal_generation(request):
             #     all_results.append(f"{coin_pair}: In cooldown.")
             #     continue
                 
-            kline_data = fetch_kline_data(coin_pair)
-            if kline_data is None or not kline_data:
+            kline_data_list = fetch_kline_data(coin_pair) # Renamed to kline_data_list
+
+            if kline_data_list is None:
                 logger.warning(f"Could not fetch kline data for {coin_pair}.")
                 all_results.append(f"{coin_pair}: No kline data.")
                 continue
 
-            required_points = max(config.SMA_PERIOD, config.RSI_PERIOD) + 5
+            # Convert list of dicts to DataFrame
+            kline_data = pd.DataFrame(kline_data_list)
+            
+            # Now check if the DataFrame is empty
+            if kline_data.empty:
+                logger.warning(f"Kline data for {coin_pair} is empty after DataFrame conversion.")
+                all_results.append(f"{coin_pair}: Empty kline data.")
+                continue
+
+            required_points = max(config.SMA_PERIOD, config.RSI_PERIOD) + 5 # Ensure this uses attributes from config
             if len(kline_data) < required_points:
                 logger.warning(f"Not enough data points ({len(kline_data)} < {required_points}) for {coin_pair}.")
                 all_results.append(f"{coin_pair}: Not enough data ({len(kline_data)} points).")
@@ -155,40 +169,60 @@ def run_signal_generation(request):
 
             if generated_signal_details and isinstance(generated_signal_details, dict):
                 signal_type = generated_signal_details.get("type")
-                signal_price = generated_signal_details.get("price")
-                log_message = f"{coin_pair}: {signal_type} signal generated at {signal_price}. Confidence: {generated_signal_details.get('confidence')}."
+                signal_price = generated_signal_details.get("price") # This is entry or exit price depending on type
+                confidence = generated_signal_details.get('confidence')
+                sentiment_score = generated_signal_details.get('sentiment_score') # Assuming it's there
+                rsi_value = generated_signal_details.get('rsi') # Assuming it's there
+
+                log_message = f"{coin_pair}: {signal_type} signal generated at {signal_price}. Confidence: {confidence}."
                 logger.info(log_message)
 
                 action_taken = False
                 if signal_type in ["LONG", "SHORT"]: # New entry signals
-                    position_ref = save_position(generated_signal_details, db)
-                    if position_ref:
+                    pos_id, _ = record_new_position(
+                        symbol=coin_pair, 
+                        signal_type=signal_type, 
+                        entry_price=signal_price, 
+                        db=db,
+                        signal_data=generated_signal_details # Pass the whole dict here
+                    )
+                    if pos_id:
                         send_telegram_message(generated_signal_details)
                         record_signal_ts(coin_pair, db) # Record timestamp for new LONG/SHORT
-                        all_results.append(f"{log_message} Saved and Notified.")
+                        all_results.append(f"{log_message} Saved (ID: {pos_id}) and Notified.")
                         action_taken = True
                     else:
                         all_results.append(f"{log_message} FAILED to save position.")
                 
-                elif signal_type == "EXIT":
-                    position_ref_path = generated_signal_details.get("position_ref")
-                    if position_ref_path and close_position(position_ref_path, signal_price, db):
+                elif signal_type == "EXIT" or signal_type == "EXIT_LONG" or signal_type == "EXIT_SHORT": # Modified condition
+                    # position_id_to_close = generated_signal_details.get("position_ref") # This should be the ID
+                    # The signal_generator now includes 'original_position_id' for exits
+                    position_id_to_close = generated_signal_details.get("original_position_id") 
+                    exit_price = signal_price # For EXIT, signal_price is the exit_price
+                    
+                    if not position_id_to_close:
+                        logger.error(f"[{coin_pair}] {signal_type} signal received but 'original_position_id' is missing in signal_details: {generated_signal_details}")
+                        all_results.append(f"{log_message} {signal_type} FAILED: Missing original_position_id.")
+                    elif close_open_position(position_id_to_close, exit_price, db):
                         send_telegram_message(generated_signal_details)
-                        # record_signal_ts(coin_pair, db) # Do not record cooldown for EXIT
-                        all_results.append(f"{log_message} Position Closed and Notified.")
+                        # record_signal_ts(coin_pair, db) # Cooldown for exits? Generally no, but can be added.
+                        all_results.append(f"{log_message} Position {position_id_to_close} Closed and Notified.")
                         action_taken = True
                     else:
-                        all_results.append(f"{log_message} FAILED to close position or missing ref_path.")
+                        all_results.append(f"{log_message} FAILED to close position {position_id_to_close}.")
 
                 elif signal_type and (signal_type.startswith("AVG_DOWN") or signal_type.startswith("AVG_UP")):
-                    position_ref_path = generated_signal_details.get("position_ref")
-                    if position_ref_path and update_position(position_ref_path, generated_signal_details, db):
+                    # For now, assuming AVG_UP uses the same logic as AVG_DOWN for update
+                    position_id_to_update = generated_signal_details.get("position_ref") # This should be the ID
+                    new_entry_price_for_avg = signal_price
+                    # def update_avg_down_position(position_id, new_entry_price, additional_quantity_percentage, db)
+                    # Passing 0 for additional_quantity_percentage as it's not used by current manager and not in signal_details
+                    if position_id_to_update and update_avg_down_position(position_id_to_update, new_entry_price_for_avg, 0, db):
                         send_telegram_message(generated_signal_details)
-                        # record_signal_ts(coin_pair, db) # Do not record cooldown for AVG signals
-                        all_results.append(f"{log_message} Position Updated and Notified.")
+                        all_results.append(f"{log_message} Position {position_id_to_update} Updated and Notified.")
                         action_taken = True
                     else:
-                        all_results.append(f"{log_message} FAILED to update position or missing ref_path.")
+                        all_results.append(f"{log_message} FAILED to update position {position_id_to_update} or missing ID.")
                 
                 if not action_taken and signal_type: # If a signal type was returned but not handled above
                      all_results.append(f"{log_message} Signal type {signal_type} not processed for action.")
