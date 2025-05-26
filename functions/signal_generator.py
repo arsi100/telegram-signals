@@ -318,17 +318,17 @@ def process_crypto_data(symbol: str, kline_data: pd.DataFrame, db: firestore.Cli
         elif rule_based_signal_intent: # Rule-based LONG or SHORT intent for NEW position; this elif corresponds to 'if open_pos:'
             logger.debug(f"[SG_DEBUG_RULES] {symbol}: Evaluating NEW rule-based position for intent: {rule_based_signal_intent}")
             current_volume_tier = volume_analysis.get('volume_tier', 'UNKNOWN')
-            # volume_tier_ok = current_volume_tier not in ['VERY_LOW', 'UNKNOWN'] # Old logic
             
-            # New logic from Grok's suggestion (Step 2)
-            volume_tier_ok = (
-                current_volume_tier not in ['UNKNOWN'] and 
-                (current_volume_tier != 'VERY_LOW' or # Allow if not VERY_LOW
-                 (rsi > config.RSI_OVERBOUGHT_THRESHOLD and rule_based_signal_intent == "LONG" and latest_close > ema) or # Allow VERY_LOW for strong LONG RSI & EMA
-                 (rsi < config.RSI_OVERSOLD_THRESHOLD and rule_based_signal_intent == "SHORT" and latest_close < ema) # Allow VERY_LOW for strong SHORT RSI & EMA (Grok: added latest_close < ema for SHORT)
-                )
+            # Refined volume_tier_ok logic for Step 2
+            volume_tier_ok = current_volume_tier not in ['UNKNOWN'] and (
+                current_volume_tier != 'VERY_LOW' or
+                (current_volume_tier == 'VERY_LOW' and (
+                    # Allow VERY_LOW if RSI is strong for the intent direction AND price confirms trend vs EMA
+                    (rsi > config.RSI_OVERBOUGHT_THRESHOLD and latest_close > ema and rule_based_signal_intent == "LONG") or 
+                    (rsi < config.RSI_OVERSOLD_THRESHOLD and latest_close < ema and rule_based_signal_intent == "SHORT")
+                ))
             )
-
+            
             late_warning = volume_analysis.get('late_entry_warning', False)
             
             sentiment_aligned_for_rule = False
