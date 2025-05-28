@@ -148,11 +148,9 @@ Ensure all float values are numbers, not strings.
             return None
 
     except Exception as e:
-        logger.error(f"[{symbol}] Error during Gemini API call: {e}", exc_info=True)
-        # Check for specific API errors if the SDK provides them
-        # The 'e' object itself (google.api_core.exceptions.InvalidArgument) contains useful details.
-        # No need to probe for e.response.status_code if it's not consistently there.
-        # logger.error(f"[{symbol}] Gemini API error details: {str(e)}") # This is covered by exc_info=True
+        logger.error(f"[{symbol}] Error during Gemini API call. Exception Type: {type(e).__name__}, Args: {e.args}", exc_info=True)
+        # The exc_info=True should provide the full traceback. The line above is for extra verbosity.
+        # logger.error(f"[{symbol}] Gemini API error details: {str(e)}") # This is covered by exc_info=True and the line above
         return None
 
 # Example Test Block (optional, for direct testing of this module if needed)
