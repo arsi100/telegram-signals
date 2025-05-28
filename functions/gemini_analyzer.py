@@ -1,6 +1,7 @@
 import logging
 import json
 import google.generativeai as genai
+import traceback
 from . import config
 
 logger = logging.getLogger(__name__)
@@ -148,9 +149,12 @@ Ensure all float values are numbers, not strings.
             return None
 
     except Exception as e:
-        logger.error(f"[{symbol}] Error during Gemini API call. Exception Type: {type(e).__name__}, Args: {e.args}", exc_info=True)
-        # The exc_info=True should provide the full traceback. The line above is for extra verbosity.
-        # logger.error(f"[{symbol}] Gemini API error details: {str(e)}") # This is covered by exc_info=True and the line above
+        # Capture the full traceback as a string
+        full_traceback = traceback.format_exc()
+        logger.error(f"[{symbol}] Error during Gemini API call. Exception Type: {type(e).__name__}, Args: {e.args}. Full Traceback:\n{full_traceback}")
+        # The exc_info=True from the previous attempt can be removed if this works, or kept for defense in depth.
+        # For now, let's log both, though it might be redundant if full_traceback is comprehensive.
+        # logger.error(f"[{symbol}] Repeating error with exc_info=True:", exc_info=True) # Optional: keep for comparison
         return None
 
 # Example Test Block (optional, for direct testing of this module if needed)
