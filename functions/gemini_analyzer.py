@@ -149,12 +149,26 @@ Ensure all float values are numbers, not strings.
             return None
 
     except Exception as e:
-        # Capture the full traceback as a string
+        # Log essential details of the exception on separate lines
+        # to avoid potential truncation of a single large log message.
+        logger.error(f"[{symbol}] Gemini API Exception Type: {type(e).__name__}")
+        logger.error(f"[{symbol}] Gemini API Exception Args: {e.args}")
+        
+        if hasattr(e, '__cause__') and e.__cause__:
+            logger.error(f"[{symbol}] Gemini API Exception Cause Type: {type(e.__cause__).__name__}")
+            logger.error(f"[{symbol}] Gemini API Exception Cause Args: {e.__cause__.args}")
+            logger.error(f"[{symbol}] Gemini API Exception Cause Str: {str(e.__cause__)}")
+
+
+        if hasattr(e, '__context__') and e.__context__:
+            logger.error(f"[{symbol}] Gemini API Exception Context Type: {type(e.__context__).__name__}")
+            logger.error(f"[{symbol}] Gemini API Exception Context Args: {e.__context__.args}")
+            logger.error(f"[{symbol}] Gemini API Exception Context Str: {str(e.__context__)}")
+
+        # Also log the full traceback string, as it might work or provide some info
         full_traceback = traceback.format_exc()
-        logger.error(f"[{symbol}] Error during Gemini API call. Exception Type: {type(e).__name__}, Args: {e.args}. Full Traceback:\n{full_traceback}")
-        # The exc_info=True from the previous attempt can be removed if this works, or kept for defense in depth.
-        # For now, let's log both, though it might be redundant if full_traceback is comprehensive.
-        # logger.error(f"[{symbol}] Repeating error with exc_info=True:", exc_info=True) # Optional: keep for comparison
+        logger.error(f"[{symbol}] Gemini API Full Traceback (attempt):\n{full_traceback}")
+        
         return None
 
 # Example Test Block (optional, for direct testing of this module if needed)
