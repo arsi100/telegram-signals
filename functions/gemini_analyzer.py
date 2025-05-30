@@ -151,25 +151,25 @@ Ensure all float values are numbers, not strings.
     except Exception as e:
         # Log essential details of the exception on separate lines
         # to avoid potential truncation of a single large log message.
-        logger.error(f"[{symbol}] Gemini API Exception Type: {type(e).__name__}")
-        logger.error(f"[{symbol}] Gemini API Exception Args: {e.args}")
+        logger.error("Gemini API Exception Type: %s", type(e).__name__)
+        logger.error("Gemini API Exception Args: %s", str(e.args))
         
-        if hasattr(e, '__cause__') and e.__cause__:
-            logger.error(f"[{symbol}] Gemini API Exception Cause Type: {type(e.__cause__).__name__}")
-            logger.error(f"[{symbol}] Gemini API Exception Cause Args: {e.__cause__.args}")
-            logger.error(f"[{symbol}] Gemini API Exception Cause Str: {str(e.__cause__)}")
+        if hasattr(e, '__cause__') and e.__cause__: # Check __cause__ first
+            logger.error("Gemini API Exception Cause Type: %s", type(e.__cause__).__name__)
+            logger.error("Gemini API Exception Cause Args: %s", str(e.__cause__.args))
+            logger.error("Gemini API Exception Cause: %s", str(e.__cause__))
 
-
-        if hasattr(e, '__context__') and e.__context__:
-            logger.error(f"[{symbol}] Gemini API Exception Context Type: {type(e.__context__).__name__}")
-            logger.error(f"[{symbol}] Gemini API Exception Context Args: {e.__context__.args}")
-            logger.error(f"[{symbol}] Gemini API Exception Context Str: {str(e.__context__)}")
+        if hasattr(e, '__context__') and e.__context__: # Then check __context__
+            logger.error("Gemini API Exception Context Type: %s", type(e.__context__).__name__)
+            logger.error("Gemini API Exception Context Args: %s", str(e.__context__.args))
+            logger.error("Gemini API Exception Context: %s", str(e.__context__))
 
         # Also log the full traceback string, as it might work or provide some info
-        full_traceback = traceback.format_exc()
-        logger.error(f"[{symbol}] Gemini API Full Traceback (attempt):\n{full_traceback}")
+        # full_traceback = traceback.format_exc() # This was the previous attempt
+        # logger.error(f"[{symbol}] Gemini API Full Traceback (attempt):\n{full_traceback}")
         
-        return None
+        # Re-raise to preserve the error for Cloud Logging or other handlers
+        raise  # <--- ADDED THIS
 
 # Example Test Block (optional, for direct testing of this module if needed)
 if __name__ == '__main__':
