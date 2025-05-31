@@ -5,7 +5,7 @@ RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
     cd ta-lib && \
     ./configure --prefix=/usr && make && make install && \
     ldconfig
-RUN pip install TA-Lib==0.4.29
+RUN pip install "numpy<2.0" TA-Lib==0.4.29
 WORKDIR /app
 COPY ./functions /app
 RUN pip install -r /app/requirements.txt
