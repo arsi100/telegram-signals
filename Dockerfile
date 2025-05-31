@@ -1,12 +1,22 @@
 FROM python:3.9-slim
-RUN apt-get update && apt-get install -y wget build-essential
-RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
-    tar -xzf ta-lib-0.4.0-src.tar.gz && \
-    cd ta-lib && \
-    ./configure --prefix=/usr && make && make install && \
-    ldconfig
-RUN pip install --no-cache-dir "numpy<2.0"
-RUN pip install --no-cache-dir Cython==0.29.36 TA-Lib==0.4.29
+RUN apt-get update && apt-get install -y wget build-essential \
+    && wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz \
+    && tar -xzf ta-lib-0.4.0-src.tar.gz \
+    && cd ta-lib \
+    && ./configure --prefix=/usr \
+    && make \
+    && make install \
+    && ldconfig \
+    && cd .. \
+    && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+
+ENV TA_INCLUDE_PATH=/usr/include
+ENV TA_LIBRARY_PATH=/usr/lib
+
+RUN pip install --no-cache-dir \
+    "Cython>=0.29.36" \
+    "numpy<2.0" \
+    "TA-Lib==0.4.30"
 WORKDIR /app
 COPY ./functions /app
 RUN pip install --no-cache-dir -r /app/requirements.txt
