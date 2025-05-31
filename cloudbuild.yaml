@@ -1,4 +1,11 @@
 steps:
+# Step 0: Install TA-Lib system dependencies
+- name: 'gcr.io/cloud-builders/apt'
+  args: ['update']
+- name: 'gcr.io/cloud-builders/apt'
+  args: ['install', '-y', 'ta-lib-dev']
+
+# Step 1: Deploy the function (existing step)
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args:
