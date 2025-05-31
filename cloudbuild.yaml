@@ -15,28 +15,33 @@ steps:
     make install
     # ldconfig is not needed here as it's a non-system path and for a different container context
 
-# Step 1: Deploy the function (existing step)
+# Step 1: Build the custom Docker image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA', '.']
+
+# Step 2: Push the Docker image to Google Container Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA']
+
+# Step 3: Deploy Cloud Function from the custom Docker image
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args:
     - functions
     - deploy
-    - run_signal_generation  # Your function name
-    - --source=./functions  # Directory containing your function code relative to root
-    - --entry-point=run_signal_generation # Python function to execute
-    - --runtime=python311  # Updated to Python 3.11
-    - --trigger-http       # Trigger via HTTP (for Cloud Scheduler)
-    - --region=us-central1 # Deployment region (adjust if needed)
-    - --project=telegram-signals-205cc # Explicitly specify project ID
-    - --gen2               # Use Cloud Functions (2nd gen) backed by Cloud Run
-    - --memory=512M        # Memory allocation
-    - --cpu=1              # CPU allocation
-    - --timeout=300s       # Function execution timeout
-    - --min-instances=0    # Minimum instances
-    - --max-instances=2    # Maximum instances
-    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest,LUNARCRUSH_API_KEY=LUNARCRUSH_API_KEY:latest # Added LunarCrush API key
+    - run_signal_generation # Your function name
+    - --docker-image=gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA
+    - --gen2
+    - --trigger-http
+    - --region=us-central1
+    - --project=telegram-signals-205cc
+    - --memory=512M
+    - --cpu=1
+    - --timeout=300s
+    - --min-instances=0
+    - --max-instances=2
+    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest,LUNARCRUSH_API_KEY=LUNARCRUSH_API_KEY:latest
     - --allow-unauthenticated
-    - --set-build-env-vars=CFLAGS=-I/workspace/ta-lib-installation/include,LDFLAGS=-L/workspace/ta-lib-installation/lib # Using CFLAGS and LDFLAGS
 
 # availableSecrets:
 #   secretManager:
