@@ -1,13 +1,26 @@
 steps:
-# Step 0: Install TA-Lib system dependencies
+# Step 0: Install build dependencies for TA-Lib
 - name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'apt-get'
-  args: ['update']
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'apt-get'
-  args: ['install', '-y', 'libta-lib-dev']
+  entrypoint: 'bash'
+  args:
+  - -c
+  - |
+    apt-get update && apt-get install -y wget build-essential
 
-# Step 1: Deploy the function (existing step)
+# Step 1: Download, compile, and install TA-Lib C library
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - -c
+  - |
+    wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
+    tar -xzf ta-lib-0.4.0-src.tar.gz && \
+    cd ta-lib && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install
+
+# Step 2: Deploy the function (existing step)
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args:
