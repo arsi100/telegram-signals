@@ -3,7 +3,8 @@ RUN apt-get update && apt-get install -y wget build-essential
 RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
     tar -xzf ta-lib-0.4.0-src.tar.gz && \
     cd ta-lib && \
-    ./configure --prefix=/usr && make && make install
+    ./configure --prefix=/usr && make && make install && \
+    ldconfig
 RUN pip install TA-Lib==0.4.29
 WORKDIR /app
 COPY ./functions /app
