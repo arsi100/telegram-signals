@@ -5,7 +5,7 @@ steps:
   args: ['update']
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'apt-get'
-  args: ['install', '-y', 'ta-lib-dev']
+  args: ['install', '-y', 'libta-lib-dev']
 
 # Step 1: Deploy the function (existing step)
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
