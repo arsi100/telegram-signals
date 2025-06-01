@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 import pandas as pd
 import sys
 import os
@@ -220,6 +220,68 @@ class TestLocalSignalGeneration(unittest.TestCase):
             self.assertEqual(result_signal['reason_for_exit'], 'Rule-based exit criteria met.')
 
             print(f"Test {self.id()} PASSED. Signal: {result_signal['signal_type']} for {symbol} with Confidence: {result_signal['confidence_score']}")
+
+    @patch('functions.config.ENABLE_GEMINI_ANALYSIS', True) # Ensure Gemini is enabled for this test specifically
+    @patch('functions.signal_generator.get_sentiment_score')
+    @patch('functions.signal_generator.get_open_position')
+    @patch('functions.signal_generator.is_in_cooldown_period')
+    @patch('functions.signal_generator.analyze_technicals')
+    # Note: We are NOT patching functions.signal_generator.get_gemini_analysis here.
+    # Instead, we will patch 'functions.gemini_analyzer.genai.GenerativeModel'
+    # or more simply 'google.generativeai.GenerativeModel' if gemini_analyzer imports it that way.
+    def test_gemini_api_failure_logging(
+        self,
+        mock_analyze_technicals,    # from @patch('...analyze_technicals')
+        mock_is_in_cooldown_period, # from @patch('...is_in_cooldown_period')
+        mock_get_open_position,     # from @patch('...get_open_position')
+        mock_get_sentiment_score    # from @patch('...get_sentiment_score')
+    ):
+        print(f"Running: test_gemini_api_failure_logging with refined mocking")
+        symbol = 'PF_GEMINI_FAIL_USD'
+        current_price = 300.00
+
+        # Mock dependencies of process_crypto_data up to the point of calling get_gemini_analysis
+        mock_analyze_technicals.return_value = {
+            'rsi': 50.0, 'ema_short': current_price, 'ema_long': current_price,
+            'ema': current_price, 
+            'atr': 1.0, 'volume_ratio_to_mean': 1.0,
+            'pattern_name': 'None',
+            'pattern': { 'pattern_name': 'None', 'pattern_type': 'neutral', 'score': 0, 'pattern_detected_raw': False}, # Added raw
+            'primary_trend': 'NEUTRAL', 'price_vs_ema_short': 'at', 'price_vs_ema_long': 'at',
+            'latest_price': current_price, 'latest_timestamp': pd.Timestamp.now(tz='UTC'),
+            'df_length': 200,
+            'volume_analysis': {'volume_tier': 'NORMAL', 'volume_ratio': 1.0, 'late_entry_warning': False } # Added ratio/warning
+        }
+        mock_is_in_cooldown_period.return_value = False
+        mock_get_open_position.return_value = None
+        # Provide a more complete sentiment mock similar to other tests
+        mock_get_sentiment_score.return_value = {
+            'sentiment_score_raw': 0.5, 'source': 'mock', 'error': None,
+            'sentiment_confidence_final_RULE_WEIGHTED': 0.05 # Example value
+        }
+        
+        mock_kline_data = self.create_mock_market_data(current_price=current_price)
+        mock_db_client = MagicMock(spec=firestore.Client)
+
+        # Mock the GenerativeModel class within the gemini_analyzer's scope (or global if imported as genai)
+        # to control the behavior of model.generate_content()
+        mock_gemini_model_instance = MagicMock()
+        mock_gemini_model_instance.generate_content.side_effect = ValueError("Mock Gemini API failure from refined test")
+
+        # Patch 'functions.gemini_analyzer.genai.GenerativeModel' because gemini_analyzer.py does 'import google.generativeai as genai'
+        # and then calls 'genai.GenerativeModel'
+        with patch('functions.gemini_analyzer.genai.GenerativeModel', return_value=mock_gemini_model_instance) as mock_generative_model_class:
+            print("Calling process_crypto_data, expecting internal Gemini failure and specific logs from gemini_analyzer.py...")
+            
+            # This call will lead to get_gemini_analysis being called, which will then try to use the mocked genai.GenerativeModel
+            result_signal = process_crypto_data(symbol, mock_kline_data, mock_db_client)
+
+        self.assertIsNone(result_signal, "Signal should be None due to mocked Gemini API failure.")
+        mock_generative_model_class.assert_called_once() # Verify the model was attempted to be created
+        mock_gemini_model_instance.generate_content.assert_called_once() # Verify generate_content was called
+
+        print(f"Test {self.id()} PASSED. process_crypto_data returned None as expected.")
+        print("Please check the console output for 'Gemini API Exception Type: ValueError', 'Args: ('Mock Gemini API failure from refined test',)', etc. from gemini_analyzer.py")
 
 if __name__ == '__main__':
     # Ensure logging is also configured if run directly
