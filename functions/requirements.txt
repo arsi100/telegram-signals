@@ -7,7 +7,7 @@ google-cloud-logging>=3.0.0
 numpy==1.26.4
 pandas==2.2.1
 pandas-ta==0.3.14b0
-TA-Lib==0.4.29 # Using pandas-ta and TA-Lib for comprehensive technical analysis
+# TA-Lib==0.4.29 # Using pandas-ta and TA-Lib for comprehensive technical analysis
 
 # API Clients & HTTP
 requests==2.31.0
