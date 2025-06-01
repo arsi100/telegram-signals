@@ -13,10 +13,8 @@ RUN apt-get update && apt-get install -y wget build-essential \
 ENV TA_INCLUDE_PATH=/usr/include
 ENV TA_LIBRARY_PATH=/usr/lib
 
-RUN pip install --no-cache-dir \
-    "Cython>=0.29.36" \
-    "numpy<2.0" \
-    "TA-Lib==0.4.29" --only-binary=:all:
+RUN pip install --no-cache-dir "Cython>=0.29.36" "numpy==1.26.4"
+RUN pip install --no-cache-dir "TA-Lib==0.4.30"
 WORKDIR /app
 COPY ./functions /app
 RUN pip install --no-cache-dir -r /app/requirements.txt
