@@ -14,7 +14,7 @@ ENV TA_INCLUDE_PATH=/usr/include
 ENV TA_LIBRARY_PATH=/usr/lib
 
 RUN pip install --no-cache-dir "Cython>=0.29.36" "numpy==1.26.4"
-RUN pip install --no-cache-dir "TA-Lib==0.4.30"
+RUN pip install --no-cache-dir "TA-Lib==0.4.31" --no-build-isolation
 WORKDIR /app
 COPY ./functions /app
 RUN pip install --no-cache-dir -r /app/requirements.txt
