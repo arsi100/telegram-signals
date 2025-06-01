@@ -1,20 +1,4 @@
 steps:
-# Step 0: Install dependencies and Build TA-Lib from source into /workspace
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'bash'
-  args:
-  - -c
-  - |
-    apt-get update && apt-get install -y wget build-essential && \
-    mkdir -p /workspace/ta-lib-build && cd /workspace/ta-lib-build && \
-    wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
-    tar -xzf ta-lib-0.4.0-src.tar.gz && \
-    cd ta-lib && \
-    ./configure --prefix=/workspace/ta-lib-installation && \
-    make && \
-    make install
-    # ldconfig is not needed here as it's a non-system path and for a different container context
-
 # Step 1: Build the custom Docker image
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', 'gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA', '.']
