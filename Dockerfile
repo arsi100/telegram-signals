@@ -10,7 +10,7 @@ COPY ./functions /app
 RUN pip install --no-cache-dir "Cython>=0.29.36" "numpy==1.26.4" -r /app/requirements.txt
 
 # Download and install the TA-Lib wheel manually
-RUN wget https://files.pythonhosted.org/packages/e3/69/982817f8e812742805b3a282888d736236c79893493e4688d72039533f17/TA_Lib-0.4.31-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl -O /tmp/TA_Lib.whl && \
+RUN wget https://files.pythonhosted.org/packages/1c/95/53756306870979c2f98c0a0564e656c3922f74bf6d5a4392c3e787da170d/TA_Lib-0.4.31-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl -O /tmp/TA_Lib.whl && \
     pip install --no-cache-dir /tmp/TA_Lib.whl && \
     rm /tmp/TA_Lib.whl
 
