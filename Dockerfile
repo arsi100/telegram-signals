@@ -16,7 +16,7 @@ ENV TA_LIBRARY_PATH=/usr/lib
 RUN pip install --no-cache-dir \
     "Cython>=0.29.36" \
     "numpy<2.0" \
-    "TA-Lib==0.4.29"
+    "TA-Lib==0.4.29" --only-binary=:all:
 WORKDIR /app
 COPY ./functions /app
 RUN pip install --no-cache-dir -r /app/requirements.txt
