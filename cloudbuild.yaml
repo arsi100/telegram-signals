@@ -1,11 +1,11 @@
 steps:
 # Step 1: Build the custom Docker image
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA', '.']
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/telegram-signals-205cc/cloud-fxn-images/run-signal-generation:$COMMIT_SHA', '.']
 
 # Step 2: Push the Docker image to Google Container Registry
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA']
+  args: ['push', 'us-central1-docker.pkg.dev/telegram-signals-205cc/cloud-fxn-images/run-signal-generation:$COMMIT_SHA']
 
 # Step 3: Deploy Cloud Function from the custom Docker image
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -14,7 +14,7 @@ steps:
     - functions
     - deploy
     - run_signal_generation # Your function name
-    - --docker-image=gcr.io/telegram-signals-205cc/run-signal-generation:$COMMIT_SHA
+    - --docker-image=us-central1-docker.pkg.dev/telegram-signals-205cc/cloud-fxn-images/run-signal-generation:$COMMIT_SHA
     - --gen2
     - --trigger-http
     - --region=us-central1
