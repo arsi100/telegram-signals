@@ -47,7 +47,7 @@ options:
   # defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET # No - use default
 
 # Optional: Specify the service account Cloud Build uses (uses default if omitted)
-# serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-cloud-build-service-account@...'
+serviceAccount: 'projects/telegram-signals-205cc/serviceAccounts/777440185914@cloudbuild.gserviceaccount.com'
 # Triggering build after Org Policy update.
 
 # Trigger rebuild comment
