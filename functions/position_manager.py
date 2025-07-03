@@ -19,6 +19,11 @@ def get_open_position(symbol, db):
     """Retrieve an open position for a given symbol."""
     try:
         positions_ref = db.collection(f'crypto_positions_{config.MODE.lower()}')
+        # NOTE: The following query uses `firestore.FieldFilter`.
+        # This requires `google-cloud-firestore` library version 2.11.0 or later.
+        # If you see an `AttributeError: module 'google.cloud.firestore' has no attribute 'FieldFilter'`,
+        # please upgrade your library by running:
+        # pip install --upgrade google-cloud-firestore
         query = positions_ref.where(filter=firestore.FieldFilter('symbol', '==', symbol)) \
                            .where(filter=firestore.FieldFilter('status', '==', 'OPEN'))
         
@@ -198,6 +203,108 @@ def update_avg_down_position(position_id, new_entry_price, additional_quantity_p
         return True
     except Exception as e:
         logger.error(f"Error updating position {position_id} for averaging down: {e}")
+        return False
+
+def calculate_current_pnl(position_data: dict, current_price: float) -> dict:
+    """
+    Calculate current P/L and related metrics for an open position.
+    
+    Args:
+        position_data: Dictionary containing position details
+        current_price: Current market price
+        
+    Returns:
+        Dictionary with P/L metrics:
+        - pnl_percentage: Current P/L as percentage
+        - pnl_absolute: Current P/L in absolute terms
+        - is_profit: Boolean indicating if position is profitable
+        - distance_from_entry: Percentage distance from entry
+    """
+    try:
+        entry_price = float(position_data.get('entry_price', 0))
+        position_type = position_data.get('type', 'UNKNOWN')
+        
+        if entry_price == 0:
+            logger.warning(f"Invalid entry price (0) for position calculation")
+            return {
+                'pnl_percentage': 0.0,
+                'pnl_absolute': 0.0,
+                'is_profit': False,
+                'distance_from_entry': 0.0
+            }
+            
+        # Calculate P/L percentage based on position type
+        if position_type == 'LONG':
+            pnl_percentage = ((current_price - entry_price) / entry_price) * 100
+            pnl_absolute = current_price - entry_price
+        elif position_type == 'SHORT':
+            pnl_percentage = ((entry_price - current_price) / entry_price) * 100
+            pnl_absolute = entry_price - current_price
+        else:
+            logger.warning(f"Unknown position type: {position_type}")
+            return {
+                'pnl_percentage': 0.0,
+                'pnl_absolute': 0.0,
+                'is_profit': False,
+                'distance_from_entry': 0.0
+            }
+            
+        # Calculate absolute distance from entry (useful for trailing stops)
+        distance_from_entry = abs(((current_price - entry_price) / entry_price) * 100)
+        
+        return {
+            'pnl_percentage': round(pnl_percentage, 2),
+            'pnl_absolute': round(pnl_absolute, 8),  # More decimals for crypto
+            'is_profit': pnl_percentage > 0,
+            'distance_from_entry': round(distance_from_entry, 2)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating current P/L: {e}")
+        return {
+            'pnl_percentage': 0.0,
+            'pnl_absolute': 0.0,
+            'is_profit': False,
+            'distance_from_entry': 0.0
+        }
+
+def update_position_pnl(position_id: str, current_price: float, db: firestore.Client) -> bool:
+    """
+    Update the current P/L for an open position.
+    
+    Args:
+        position_id: Firestore document ID of the position
+        current_price: Current market price
+        db: Firestore client
+        
+    Returns:
+        Boolean indicating success
+    """
+    try:
+        position_ref = db.collection(f'crypto_positions_{config.MODE.lower()}').document(position_id)
+        position_doc = position_ref.get()
+        
+        if not position_doc.exists:
+            logger.warning(f"Position {position_id} not found, cannot update P/L")
+            return False
+            
+        position_data = position_doc.to_dict()
+        pnl_data = calculate_current_pnl(position_data, current_price)
+        
+        # Update position with new P/L data
+        position_ref.update({
+            'current_price': float(current_price),
+            'pnl_percentage': pnl_data['pnl_percentage'],
+            'pnl_absolute': pnl_data['pnl_absolute'],
+            'distance_from_entry': pnl_data['distance_from_entry'],
+            'updated_at': firestore.SERVER_TIMESTAMP
+        })
+        
+        logger.info(f"Updated P/L for position {position_id}: {pnl_data['pnl_percentage']}%")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error updating P/L for position {position_id}: {e}")
         return False
 
 # Keep calculate_profit_percentage as a helper if needed elsewhere, or remove if only used in close_position

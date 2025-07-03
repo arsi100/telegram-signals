@@ -1,11 +1,11 @@
 steps:
 # Step 1: Build the custom Docker image
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'us-central1-docker.pkg.dev/telegram-signals-205cc/cloud-fxn-images/run-signal-generation:$COMMIT_SHA', '.']
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/cloud-fxn-image:$COMMIT_SHA', '.']
 
 # Step 2: Push the Docker image to Google Container Registry
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'us-central1-docker.pkg.dev/telegram-signals-205cc/cloud-fxn-images/run-signal-generation:$COMMIT_SHA']
+  args: ['push', 'gcr.io/$PROJECT_ID/cloud-fxn-image:$COMMIT_SHA']
 
 # Step 3: Deploy Cloud Function from the custom Docker image
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -14,7 +14,7 @@ steps:
     - functions
     - deploy
     - run_signal_generation # Your function name
-    - --docker-image=us-central1-docker.pkg.dev/telegram-signals-205cc/cloud-fxn-images/run-signal-generation:$COMMIT_SHA
+    - --docker-image=gcr.io/$PROJECT_ID/cloud-fxn-image:$COMMIT_SHA
     - --gen2
     - --trigger-http
     - --region=us-central1
@@ -46,8 +46,9 @@ options:
   dynamicSubstitutions: true # Allows use of variables like $PROJECT_ID
   # defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET # No - use default
 
-# Optional: Specify the service account Cloud Build uses (uses default if omitted)
-serviceAccount: 'projects/telegram-signals-205cc/serviceAccounts/777440185914@cloudbuild.gserviceaccount.com'
+# The serviceAccount key is removed from here to allow Cloud Build to use its default service account.
 # Triggering build after Org Policy update.
+
+# Test push to GCR for diagnostic - switching from Artifact Registry
 
 # Trigger rebuild comment

@@ -94,6 +94,14 @@ CONFIDENCE_WEIGHTS = {
 }
 
 # Technical Analysis Parameters
+
+# -- Parameters for the new 15m/4h Scalp Strategy --
+EMA_PERIOD_4H = 20            # EMA period for the 4-hour (macro) timeframe
+EMA_PERIOD_15M = 10           # EMA period for the 15-minute (signal) timeframe
+RSI_PERIOD_15M = 14           # RSI period for the 15-minute timeframe
+VOLUME_SMA_PERIOD_15M = 20    # SMA period for calculating volume z-score on 15m timeframe
+
+# -- Original/Generic Parameters --
 # Grok: Updated RSI thresholds
 RSI_PERIOD = 7
 RSI_OVERSOLD_THRESHOLD = 25    # RSI below this is considered oversold

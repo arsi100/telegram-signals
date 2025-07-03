@@ -2,17 +2,36 @@ import os
 import logging
 import re # Import regex for parsing
 import google.generativeai as genai
+import numpy as np
 
 # Use relative import for config
 from . import config
 from .multi_timeframe_analysis import get_trend_confirmation_score
 # from .sentiment_analysis import get_sentiment_score  # DISABLED - no real sentiment data
+from .config import (
+    CONFIDENCE_WEIGHTS, MIN_CONFIDENCE_ENTRY, MIN_CONFIDENCE_AVG,
+    RSI_OVERSOLD_THRESHOLD, RSI_OVERBOUGHT_THRESHOLD, VOLUME_TIER_THRESHOLDS,
+    GEMINI_MODEL_NAME
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Define the Gemini model name
-GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"
+# Initialize the Gemini model (if enabled in config)
+# This part will only be executed when the module is first imported.
+try:
+    if config.ENABLE_GEMINI_ANALYSIS:
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+    else:
+        model = None
+        logger.info("Gemini analysis is disabled in config. Confidence calculator will not use AI.")
+except ImportError:
+    model = None
+    logger.warning("google.generativeai package not found. Gemini features will be disabled.")
+except Exception as e:
+    model = None
+    logger.error(f"Error initializing Gemini model: {e}", exc_info=True)
 
 def get_confidence_score(tech_results: dict, sentiment_confidence: float = 0.0, signal_direction: str = "NEUTRAL") -> float:
     """
@@ -246,6 +265,63 @@ def calculate_enhanced_local_confidence(symbol, signal_intent, tech_results):
     except Exception as e:
         logger.error(f"Error calculating enhanced local confidence for {symbol}: {e}", exc_info=True)
         return 50  # Default neutral score
+
+def get_gemini_confidence(tech_results: dict, signal_direction: str) -> float:
+    """
+    Get confidence score from Gemini API based on technical analysis results.
+    
+    Args:
+        tech_results: Dictionary containing technical analysis results
+        signal_direction: String "LONG", "SHORT", or "NEUTRAL"
+        
+    Returns:
+        Float between 0 and 100 representing Gemini's confidence
+    """
+    try:
+        # Format the prompt with technical analysis results
+        prompt = f"""
+        Analyze the following technical indicators for a cryptocurrency trading signal:
+        
+        Signal Direction: {signal_direction}
+        
+        Technical Analysis Results:
+        1. Pattern: {tech_results.get('pattern', {}).get('pattern_name', 'N/A')} ({tech_results.get('pattern', {}).get('pattern_type', 'neutral')})
+        2. RSI: {tech_results.get('rsi', 50.0):.2f}
+        3. Volume Analysis:
+           - Tier: {tech_results.get('volume_analysis', {}).get('volume_tier', 'UNKNOWN')}
+           - Ratio: {tech_results.get('volume_analysis', {}).get('volume_ratio', 0):.2f}x
+           - Early Trend Signal: {tech_results.get('volume_analysis', {}).get('early_trend_signal', False)}
+        4. EMA: {tech_results.get('ema', 0):.2f} vs Price: {tech_results.get('latest_close', 0):.2f}
+        5. ATR: {tech_results.get('atr', 0):.4f}
+        
+        Based on these indicators and considering their weights:
+        - Pattern: 40%
+        - RSI: 30%
+        - Volume: 20%
+        - EMA Trend: 10%
+        
+        Provide a confidence score between 0-100 for this {signal_direction} signal.
+        Return ONLY the numeric score, no explanation.
+        """
+        
+        # Get response from Gemini
+        response = model.generate_content(prompt)
+        
+        # Extract numeric score from response
+        score_text = response.text.strip()
+        score_match = re.search(r'\d+\.?\d*', score_text)
+        
+        if score_match:
+            score = float(score_match.group())
+            return min(max(score, 0), 100)  # Ensure between 0 and 100
+        else:
+            logger.warning("Could not extract numeric score from Gemini response. Using fallback.")
+            return get_confidence_score(tech_results, 0.0, signal_direction)
+            
+    except Exception as e:
+        logger.error(f"Error getting Gemini confidence score: {e}")
+        logger.info("Using fallback confidence calculation")
+        return get_confidence_score(tech_results, 0.0, signal_direction)
 
 # Remove the old formula-based calculation, as fallback logic is now in signal_generator
 # def calculate_score_formula(...): ... 

@@ -8,7 +8,7 @@ from google.cloud import firestore
 from typing import Optional, Dict
 
 # Use relative imports
-from .technical_analysis import analyze_technicals
+from .technical_analysis import analyze_technicals, get_historical_data
 from .confidence_calculator import get_confidence_score, should_generate_signal
 from .position_manager import get_open_position, is_in_cooldown_period
 from .sentiment_analysis import get_sentiment_score, get_sentiment_confidence, calculate_directional_sentiment_adjustment
@@ -19,7 +19,93 @@ from .gemini_analyzer import get_gemini_analysis
 # Set up logging
 logger = logging.getLogger(__name__)
 
-def process_crypto_data(symbol: str, kline_data: pd.DataFrame, db: firestore.Client) -> Optional[Dict]:
+def process_crypto_data(symbol: str, db: firestore.Client) -> Optional[Dict]:
+    """
+    Processes crypto data to generate trading signals based on the validated 15m/4h strategy.
+    """
+    logger.info(f"[{symbol}] Starting signal generation process for 15m/4h strategy.")
+
+    # --- 1. Fetch Data ---
+    # Fetch 200 candles for 15m for indicators and 100 candles for 4h for macro EMA
+    kline_data_15m = get_historical_data(symbol, "15", 200)
+    kline_data_4h = get_historical_data(symbol, "240", 100)
+
+    if not kline_data_15m or not kline_data_4h:
+        logger.warning(f"[{symbol}] Could not fetch sufficient kline data for one or both timeframes. Aborting.")
+        return None
+
+    # --- 2. Cooldown and Position Check ---
+    if is_in_cooldown_period(symbol, db):
+        logger.info(f"[{symbol}] is in cooldown period. Skipping signal generation.")
+        return None
+        
+    if get_open_position(symbol, db):
+        logger.info(f"[{symbol}] already has an open position. Skipping signal generation.")
+        return None
+
+    # --- 3. Technical Analysis ---
+    technicals = analyze_technicals(kline_data_15m, kline_data_4h, symbol=symbol)
+    
+    if not technicals:
+        logger.warning(f"[{symbol}] Technical analysis failed or returned no data. Skipping signal generation.")
+        return None
+
+    # --- 4. Strategy Rule Engine ---
+    signal_intent = None
+    
+    # Core conditions from the validated backtest
+    is_macro_bullish = technicals['close'] > technicals['ema_4h']
+    is_micro_bullish = technicals['close'] > technicals['ema_10']
+    is_rsi_strong = technicals['rsi'] > 50 and technicals['rsi'] < 60
+    is_rsi_slope_positive = technicals['rsi_slope'] > 0
+    is_volume_high = technicals['vol_z'] > 1.0
+    is_close_to_ema = technicals['dist_to_ema10'] < 1.0
+
+    # Coin-specific rule
+    is_bullish_candle_required = symbol in ['SOLUSDT', 'CROUSDT']
+    passes_bullish_candle_filter = (not is_bullish_candle_required) or (is_bullish_candle_required and technicals['is_bullish'])
+
+    # Combine all conditions
+    if (is_macro_bullish and is_micro_bullish and is_rsi_strong and 
+        is_rsi_slope_positive and is_volume_high and is_close_to_ema and
+        passes_bullish_candle_filter):
+        signal_intent = "LONG"
+        logger.info(f"[{symbol}] LONG signal generated based on validated 15m/4h strategy.")
+    else:
+        # Log why no signal was generated for debugging
+        logger.info(f"[{symbol}] No signal generated. Conditions check: macro_bullish={is_macro_bullish}, micro_bullish={is_micro_bullish}, rsi_strong={is_rsi_strong}, rsi_slope_pos={is_rsi_slope_positive}, vol_high={is_volume_high}, close_to_ema={is_close_to_ema}, candle_filter={passes_bullish_candle_filter}")
+        return None
+
+    # --- 5. Signal Generation ---
+    # At this point, signal_intent is "LONG". We can now build the signal object.
+    # The original function had complex confidence scoring. We are bypassing that
+    # with our high-conviction signal. We can assign a static high confidence.
+    confidence = 95.0 # Static confidence for our validated strategy
+    final_signal_source = "MICRO_SCALP_V2" # A name for the new strategy
+
+    signal_details = {
+        "symbol": symbol,
+        "signal_type": signal_intent,
+        "source": final_signal_source,
+        "confidence": confidence,
+        "timestamp": datetime.datetime.now(pytz.utc).isoformat(),
+        "price_at_signal": technicals['close'],
+        "technicals": { # Include key technicals for context
+            "rsi": technicals.get('rsi'),
+            "ema_10": technicals.get('ema_10'),
+            "ema_4h": technicals.get('ema_4h'),
+            "volume_z_score": technicals.get('vol_z'),
+            "rsi_slope": technicals.get('rsi_slope')
+        },
+        "tp_price": technicals['close'] * 1.005, # +0.5% TP
+        "sl_price": technicals['close'] * 0.985, # -1.5% SL
+    }
+
+    logger.info(f"[{symbol}] Final signal object created: {signal_details}")
+    return signal_details
+
+
+def process_crypto_data_original(symbol: str, kline_data: pd.DataFrame, db: firestore.Client) -> Optional[Dict]:
     """
     Processes crypto data to generate trading signals, incorporating technical analysis,
     sentiment analysis, and potentially Gemini AI meta-analysis.
@@ -32,6 +118,11 @@ def process_crypto_data(symbol: str, kline_data: pd.DataFrame, db: firestore.Cli
         A dictionary with signal details if a signal is generated, otherwise None.
     """
     logger.info(f"Processing {symbol} in signal_generator.process_crypto_data")
+
+    # Check if we're in market hours
+    if not is_market_hours():
+        logger.info(f"[{symbol}] Outside market hours. Skipping signal generation.")
+        return None
 
     # Initial data validation
     # Ensure kline_data is a DataFrame and has necessary data
