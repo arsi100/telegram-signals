@@ -54,3 +54,5 @@ options:
 # Trigger rebuild comment
 
 # Re-triggering build after enabling Container Registry API.
+
+# Re-triggering build after granting Artifact Registry permissions to secondary Cloud Build SA.
