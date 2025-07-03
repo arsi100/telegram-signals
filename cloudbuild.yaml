@@ -66,3 +66,5 @@ options:
 # Re-triggering build after granting Storage Admin role.
 
 # Re-triggering build with dedicated custom service account.
+
+# Re-triggering build after enabling missing generativelanguage API.
