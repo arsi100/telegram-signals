@@ -68,3 +68,5 @@ options:
 # Re-triggering build with dedicated custom service account.
 
 # Re-triggering build after enabling missing generativelanguage API.
+
+# Re-triggering build to capture logs after fixing logging permissions.
