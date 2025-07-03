@@ -1,4 +1,8 @@
 steps:
+# Configure Docker to use gcloud as credential helper
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['auth', 'configure-docker', 'us-central1-docker.pkg.dev', '--quiet']
+
 # Step 1: Build the custom Docker image
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-fxn-images/cloud-fxn-image:$COMMIT_SHA', '.']
