@@ -58,3 +58,5 @@ options:
 # Re-triggering build after granting Artifact Registry permissions to secondary Cloud Build SA.
 
 # Re-triggering build after granting repository-level IAM permissions.
+
+# Re-triggering build after granting Storage Admin role.
