@@ -11,25 +11,19 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-fxn-images/cloud-fxn-image:$COMMIT_SHA']
 
-# Step 3: Deploy Cloud Function from the custom Docker image
+# Step 3: Deploy to Cloud Run from the custom Docker image
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args:
-    - functions
+    - run
     - deploy
-    - run_signal_generation # Your function name
-    - --docker-image=us-central1-docker.pkg.dev/$PROJECT_ID/cloud-fxn-images/cloud-fxn-image:$COMMIT_SHA
-    - --gen2
-    - --trigger-http
+    - run-signal-generation # This will be the name of your Cloud Run service
+    - --image=us-central1-docker.pkg.dev/$PROJECT_ID/cloud-fxn-images/cloud-fxn-image:$COMMIT_SHA
     - --region=us-central1
-    - --project=telegram-signals-205cc
-    - --memory=512M
-    - --cpu=1
-    - --timeout=300s
-    - --min-instances=0
-    - --max-instances=2
-    - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,CRYPTOCOMPARE_API_KEY=CRYPTOCOMPARE_API_KEY:latest,LUNARCRUSH_API_KEY=LUNARCRUSH_API_KEY:latest
-    - --allow-unauthenticated
+    - --platform=managed
+    - --allow-unauthenticated # If you want to trigger it via HTTP
+    - --project=$PROJECT_ID
+    - --set-secrets=TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,BYBIT_API_KEY=BYBIT_API_KEY:latest,BYBIT_API_SECRET=BYBIT_API_SECRET:latest,ENV=ENV:latest
 
 # availableSecrets:
 #   secretManager:
