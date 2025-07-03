@@ -1,0 +1,3 @@
+Symbol: SEIUSDT
+trail_exit: 88
+no_tp: 7

@@ -1,0 +1,3 @@
+Symbol: DOTUSDT
+trail_exit: 132
+no_tp: 19

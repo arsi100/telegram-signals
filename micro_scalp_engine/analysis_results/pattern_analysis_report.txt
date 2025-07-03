@@ -1,0 +1,846 @@
+
+=== BTCUSDT Analysis ===
+Total Successful Patterns: 0
+Average Success Rate: nan%
+Average Return: nan%
+
+Detailed Pattern Analysis:
+
+=== ETHUSDT Analysis ===
+Total Successful Patterns: 0
+Average Success Rate: nan%
+Average Return: nan%
+
+Detailed Pattern Analysis:
+
+=== SOLUSDT Analysis ===
+Total Successful Patterns: 7
+Average Success Rate: 100.0%
+Average Return: 0.73%
+
+Detailed Pattern Analysis:
+
+Pattern 0:
+  Success Rate: 100.0%
+  Average Return: 0.54%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 34.705
+    Volume Trend: -1.000
+    Upper Wick: 0.781
+    Volume Ratio: 0.694
+    Close Position: 0.574
+
+Pattern 1:
+  Success Rate: 100.0%
+  Average Return: 0.93%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 61.709
+    Volume Trend: -1.000
+    Close Position: 0.744
+    Body Ratio: 0.613
+    Momentum Score: 0.600
+
+=== DOGEUSDT Analysis ===
+Total Successful Patterns: 82
+Average Success Rate: 87.6%
+Average Return: 0.87%
+
+Detailed Pattern Analysis:
+
+Pattern 0:
+  Success Rate: 80.0%
+  Average Return: 1.06%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 63.701
+    Volume Trend: 1.000
+    Body Ratio: 0.709
+    Volume Ratio: 0.702
+    5M Momentum: -0.600
+
+Pattern 1:
+  Success Rate: 100.0%
+  Average Return: 0.77%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 56.623
+    Volume Ratio: 1.554
+    Volume Trend: 1.000
+    Momentum Score: 1.000
+    Close Position: 0.869
+
+Pattern 2:
+  Success Rate: 71.4%
+  Average Return: 0.78%
+  Occurrences: 7
+
+  Key Features:
+    RSI: 55.826
+    Volume Trend: -1.000
+    Close Position: 0.966
+    Body Ratio: 0.960
+    5M Momentum: -0.600
+
+Pattern 5:
+  Success Rate: 80.0%
+  Average Return: 0.82%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 56.974
+    Volume Trend: 1.000
+    Close Position: 0.920
+    Volume Ratio: 0.796
+    Body Ratio: 0.626
+
+Pattern 6:
+  Success Rate: 100.0%
+  Average Return: 0.77%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 43.555
+    Volume Trend: 1.000
+    Volume Ratio: 0.719
+    Body Ratio: 0.686
+    5M Momentum: -0.600
+
+Pattern 7:
+  Success Rate: 75.0%
+  Average Return: 0.91%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 39.550
+    Volume Trend: -1.000
+    Close Position: 0.949
+    Body Ratio: 0.938
+    5M Momentum: -0.600
+
+Pattern 8:
+  Success Rate: 100.0%
+  Average Return: 1.29%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 45.991
+    Volume Trend: -1.000
+    Close Position: 0.853
+    Body Ratio: 0.781
+    5M Momentum: -0.600
+
+Pattern 9:
+  Success Rate: 85.7%
+  Average Return: 0.89%
+  Occurrences: 7
+
+  Key Features:
+    RSI: 42.405
+    Volume Trend: -1.000
+    Volume Ratio: 0.879
+    Body Ratio: 0.852
+    Momentum Score: -0.600
+
+Pattern 10:
+  Success Rate: 75.0%
+  Average Return: 0.67%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 63.411
+    Volume Ratio: 1.074
+    Volume Trend: -1.000
+    Momentum Score: 1.000
+    Close Position: 0.918
+
+Pattern 11:
+  Success Rate: 100.0%
+  Average Return: 1.10%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 52.170
+    Volume Trend: 1.000
+    Body Ratio: 0.968
+    Volume Ratio: 0.676
+    5M Momentum: -0.600
+
+Pattern 13:
+  Success Rate: 100.0%
+  Average Return: 1.29%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 41.120
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    Upper Wick: 0.852
+    5M Momentum: -0.600
+
+Pattern 14:
+  Success Rate: 90.0%
+  Average Return: 0.81%
+  Occurrences: 10
+
+  Key Features:
+    RSI: 40.608
+    Volume Trend: 1.000
+    Close Position: 0.930
+    Body Ratio: 0.891
+    Volume Ratio: 0.746
+
+Pattern 16:
+  Success Rate: 77.8%
+  Average Return: 0.80%
+  Occurrences: 9
+
+  Key Features:
+    RSI: 48.398
+    Volume Trend: -1.000
+    Body Ratio: 0.768
+    5M Momentum: -0.600
+    Volume Ratio: 0.526
+
+Pattern 19:
+  Success Rate: 100.0%
+  Average Return: 0.97%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 40.491
+    Lower Wick: 1.132
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    1M Signal: -0.645
+
+Pattern 20:
+  Success Rate: 75.0%
+  Average Return: 0.54%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 30.773
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    Body Ratio: 0.685
+    1M Signal: -0.644
+
+Pattern 21:
+  Success Rate: 80.0%
+  Average Return: 0.60%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 44.523
+    Close Position: 1.000
+    Volume Trend: -1.000
+    Body Ratio: 0.781
+    Momentum Score: 0.600
+
+Pattern 22:
+  Success Rate: 100.0%
+  Average Return: 0.65%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 45.762
+    Volume Ratio: 1.781
+    Volume Trend: 1.000
+    Close Position: 0.980
+    Body Ratio: 0.844
+
+=== LINKUSDT Analysis ===
+Total Successful Patterns: 101
+Average Success Rate: 94.8%
+Average Return: 0.82%
+
+Detailed Pattern Analysis:
+
+Pattern 1:
+  Success Rate: 100.0%
+  Average Return: 0.62%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 68.428
+    Volume Ratio: 1.067
+    Volume Trend: 1.000
+    Close Position: 0.670
+    Body Ratio: 0.626
+
+Pattern 2:
+  Success Rate: 80.0%
+  Average Return: 0.70%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 48.908
+    Volume Trend: -1.000
+    Close Position: 0.973
+    Body Ratio: 0.784
+    Momentum Score: 0.600
+
+Pattern 3:
+  Success Rate: 100.0%
+  Average Return: 0.80%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 51.545
+    Volume Trend: -1.000
+    Body Ratio: 0.906
+    5M Momentum: -0.600
+    Volume Ratio: 0.432
+
+Pattern 5:
+  Success Rate: 85.7%
+  Average Return: 0.87%
+  Occurrences: 7
+
+  Key Features:
+    RSI: 55.298
+    Volume Trend: 1.000
+    Body Ratio: 0.867
+    Volume Ratio: 0.799
+    5M Momentum: -0.600
+
+Pattern 6:
+  Success Rate: 100.0%
+  Average Return: 0.95%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 35.565
+    Volume Trend: -1.000
+    Momentum Score: -1.000
+    Upper Wick: 0.987
+    1M Signal: -0.664
+
+Pattern 7:
+  Success Rate: 100.0%
+  Average Return: 1.05%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 42.435
+    Volume Trend: -1.000
+    Volume Ratio: 0.869
+    Body Ratio: 0.801
+    5M Momentum: -0.600
+
+Pattern 8:
+  Success Rate: 100.0%
+  Average Return: 0.96%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 31.663
+    Upper Wick: 1.111
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    1M Signal: -0.670
+
+Pattern 9:
+  Success Rate: 100.0%
+  Average Return: 0.93%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 54.154
+    Volume Trend: 1.000
+    Close Position: 0.782
+    Volume Ratio: 0.635
+    Momentum Score: 0.600
+
+Pattern 10:
+  Success Rate: 100.0%
+  Average Return: 0.86%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 47.911
+    Volume Trend: -1.000
+    Momentum Score: -1.000
+    Body Ratio: 0.795
+    1M Signal: -0.673
+
+Pattern 11:
+  Success Rate: 100.0%
+  Average Return: 1.58%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 51.406
+    Volume Trend: 1.000
+    Volume Ratio: 0.886
+    Close Position: 0.876
+    5M Momentum: -0.600
+
+Pattern 13:
+  Success Rate: 75.0%
+  Average Return: 0.91%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 60.108
+    Volume Trend: 1.000
+    Close Position: 0.932
+    Body Ratio: 0.721
+    Volume Ratio: 0.661
+
+Pattern 14:
+  Success Rate: 100.0%
+  Average Return: 0.84%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 33.742
+    Volume Trend: 1.000
+    Volume Ratio: 0.896
+    Close Position: 0.722
+    5M Momentum: -0.600
+
+Pattern 15:
+  Success Rate: 100.0%
+  Average Return: 0.85%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 44.782
+    Close Position: 1.000
+    Volume Trend: 1.000
+    Volume Ratio: 0.973
+    Body Ratio: 0.931
+
+Pattern 16:
+  Success Rate: 100.0%
+  Average Return: 0.95%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 49.725
+    Volume Trend: 1.000
+    Close Position: 0.982
+    Body Ratio: 0.908
+    5M Momentum: -0.600
+
+Pattern 17:
+  Success Rate: 100.0%
+  Average Return: 0.67%
+  Occurrences: 9
+
+  Key Features:
+    RSI: 31.185
+    Volume Ratio: 1.359
+    Volume Trend: -1.000
+    Body Ratio: 0.696
+    Momentum Score: -0.600
+
+Pattern 19:
+  Success Rate: 75.0%
+  Average Return: 0.51%
+  Occurrences: 8
+
+  Key Features:
+    RSI: 56.267
+    Volume Trend: -1.000
+    Close Position: 0.648
+    Body Ratio: 0.605
+    Momentum Score: 0.600
+
+Pattern 20:
+  Success Rate: 80.0%
+  Average Return: 0.56%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 43.758
+    Volume Trend: -1.000
+    Close Position: 0.961
+    Body Ratio: 0.943
+    5M Momentum: -0.600
+
+Pattern 21:
+  Success Rate: 100.0%
+  Average Return: 0.52%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 37.577
+    Close Position: 1.000
+    Volume Trend: 1.000
+    Body Ratio: 0.644
+    5M Momentum: -0.600
+
+Pattern 22:
+  Success Rate: 75.0%
+  Average Return: 0.49%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 37.070
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    Volume Ratio: 0.850
+    Body Ratio: 0.849
+
+Pattern 24:
+  Success Rate: 100.0%
+  Average Return: 0.73%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 33.748
+    Volume Trend: 1.000
+    Body Ratio: 0.952
+    Volume Ratio: 0.717
+    5M Momentum: -0.600
+
+Pattern 26:
+  Success Rate: 100.0%
+  Average Return: 0.96%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 39.706
+    Body Ratio: 1.000
+    Volume Trend: -1.000
+    Volume Ratio: 0.670
+    5M Momentum: -0.600
+
+Pattern 27:
+  Success Rate: 100.0%
+  Average Return: 0.69%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 32.667
+    Volume Trend: -1.000
+    Volume Ratio: 0.644
+    Body Ratio: 0.621
+    5M Momentum: -0.600
+
+Pattern 28:
+  Success Rate: 100.0%
+  Average Return: 0.81%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 35.987
+    Volume Trend: -1.000
+    Momentum Score: -1.000
+    Volume Ratio: 0.911
+    Body Ratio: 0.782
+
+Pattern 29:
+  Success Rate: 100.0%
+  Average Return: 0.52%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 70.107
+    Volume Trend: 1.000
+    Volume Ratio: 0.926
+    Body Ratio: 0.681
+    5M Momentum: -0.600
+
+Pattern 30:
+  Success Rate: 100.0%
+  Average Return: 1.12%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 45.253
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    Upper Wick: 0.750
+    Volume Ratio: 0.722
+
+=== ADAUSDT Analysis ===
+Total Successful Patterns: 94
+Average Success Rate: 95.2%
+Average Return: 0.74%
+
+Detailed Pattern Analysis:
+
+Pattern 0:
+  Success Rate: 100.0%
+  Average Return: 0.54%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 55.097
+    Volume Trend: 1.000
+    Momentum Score: 1.000
+    Body Ratio: 0.825
+    Close Position: 0.825
+
+Pattern 1:
+  Success Rate: 75.0%
+  Average Return: 0.47%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 66.848
+    Volume Trend: 1.000
+    Upper Wick: 1.000
+    Momentum Score: 0.600
+    5M Momentum: -0.600
+
+Pattern 2:
+  Success Rate: 100.0%
+  Average Return: 0.78%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 34.038
+    Volume Trend: -1.000
+    Close Position: 0.775
+    Body Ratio: 0.742
+    5M Momentum: -0.600
+
+Pattern 3:
+  Success Rate: 100.0%
+  Average Return: 0.79%
+  Occurrences: 6
+
+  Key Features:
+    RSI: 36.683
+    Volume Ratio: 1.024
+    Volume Trend: 1.000
+    Body Ratio: 0.780
+    5M Momentum: -0.600
+
+Pattern 4:
+  Success Rate: 100.0%
+  Average Return: 0.66%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 45.774
+    Lower Wick: 1.083
+    Close Position: 1.000
+    Volume Trend: 1.000
+    Volume Ratio: 0.601
+
+Pattern 5:
+  Success Rate: 100.0%
+  Average Return: 0.86%
+  Occurrences: 7
+
+  Key Features:
+    RSI: 44.494
+    Close Position: 1.000
+    Volume Trend: 1.000
+    Body Ratio: 0.986
+    5M Momentum: -0.600
+
+Pattern 6:
+  Success Rate: 100.0%
+  Average Return: 1.03%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 44.524
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    Volume Ratio: 0.633
+    5M Momentum: -0.600
+
+Pattern 7:
+  Success Rate: 100.0%
+  Average Return: 0.93%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 41.755
+    Upper Wick: 4.556
+    Volume Trend: -1.000
+    Momentum Score: -1.000
+    Lower Wick: 1.000
+
+Pattern 8:
+  Success Rate: 100.0%
+  Average Return: 0.76%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 44.984
+    Volume Trend: 1.000
+    Close Position: 0.710
+    Body Ratio: 0.628
+    Volume Ratio: 0.616
+
+Pattern 9:
+  Success Rate: 75.0%
+  Average Return: 0.61%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 54.476
+    Lower Wick: 2.708
+    Volume Trend: -1.000
+    Momentum Score: -1.000
+    Close Position: 0.729
+
+Pattern 10:
+  Success Rate: 100.0%
+  Average Return: 0.68%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 49.223
+    Volume Trend: -1.000
+    Close Position: 0.880
+    Body Ratio: 0.801
+    5M Momentum: -0.600
+
+Pattern 11:
+  Success Rate: 75.0%
+  Average Return: 0.56%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 74.537
+    Volume Ratio: 2.725
+    Volume Trend: 1.000
+    Momentum Score: 1.000
+    1M Signal: 0.733
+
+Pattern 12:
+  Success Rate: 85.7%
+  Average Return: 0.87%
+  Occurrences: 7
+
+  Key Features:
+    RSI: 54.897
+    Volume Trend: -1.000
+    Body Ratio: 0.876
+    Volume Ratio: 0.793
+    5M Momentum: -0.600
+
+Pattern 13:
+  Success Rate: 80.0%
+  Average Return: 0.66%
+  Occurrences: 5
+
+  Key Features:
+    RSI: 48.238
+    Volume Trend: -1.000
+    Body Ratio: 0.733
+    5M Momentum: -0.600
+    Volume Ratio: 0.600
+
+Pattern 15:
+  Success Rate: 100.0%
+  Average Return: 0.64%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 41.864
+    Volume Trend: -1.000
+    Momentum Score: -1.000
+    Body Ratio: 0.747
+    1M Signal: -0.647
+
+Pattern 16:
+  Success Rate: 100.0%
+  Average Return: 0.84%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 41.615
+    Volume Ratio: 1.252
+    Volume Trend: 1.000
+    Body Ratio: 0.858
+    Momentum Score: -0.600
+
+Pattern 17:
+  Success Rate: 100.0%
+  Average Return: 0.67%
+  Occurrences: 6
+
+  Key Features:
+    RSI: 37.978
+    Volume Ratio: 1.085
+    Volume Trend: -1.000
+    Body Ratio: 0.685
+    Momentum Score: -0.600
+
+Pattern 18:
+  Success Rate: 100.0%
+  Average Return: 0.55%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 54.044
+    Lower Wick: 2.667
+    Close Position: 1.000
+    Volume Trend: -1.000
+    Volume Ratio: 0.693
+
+Pattern 19:
+  Success Rate: 100.0%
+  Average Return: 0.69%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 29.290
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    1M Signal: -0.654
+    5M Momentum: -0.600
+
+Pattern 21:
+  Success Rate: 100.0%
+  Average Return: 1.00%
+  Occurrences: 4
+
+  Key Features:
+    RSI: 41.477
+    Body Ratio: 1.000
+    Close Position: 1.000
+    Volume Trend: -1.000
+    5M Momentum: -0.600
+
+Pattern 23:
+  Success Rate: 100.0%
+  Average Return: 0.96%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 43.757
+    Volume Trend: -1.000
+    Close Position: 0.963
+    Body Ratio: 0.829
+    Volume Ratio: 0.806
+
+Pattern 25:
+  Success Rate: 100.0%
+  Average Return: 0.75%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 29.029
+    Upper Wick: 1.167
+    Volume Trend: 1.000
+    Momentum Score: -1.000
+    Volume Ratio: 0.912
+
+Pattern 28:
+  Success Rate: 100.0%
+  Average Return: 0.73%
+  Occurrences: 3
+
+  Key Features:
+    RSI: 63.654
+    Volume Trend: -1.000
+    Body Ratio: 0.802
+    5M Momentum: -0.600
+    1M Signal: -0.442

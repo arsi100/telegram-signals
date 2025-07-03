@@ -1,0 +1,3 @@
+Symbol: ATOMUSDT
+trail_exit: 127
+no_tp: 18

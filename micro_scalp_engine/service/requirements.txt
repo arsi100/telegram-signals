@@ -1,0 +1,10 @@
+google-cloud-bigtable
+google-cloud-pubsub
+pandas
+pandas-ta
+pybit
+mplfinance
+scikit-learn
+scipy
+matplotlib
+requests 

@@ -1,0 +1,115 @@
+### **Action Plan for Micro-Scalp Engine Integration**
+
+---
+
+#### **A. Spec Review: Pitfalls & Edge-Cases**  
+1. **Data Feed Conflicts**  
+   - **Pitfall**: Kraken OHLC and Bybit ticks may have price discrepancies.  
+   - **Guard**: Normalize prices using a cross-exchange VWAP; prioritize Bybit ticks for execution.  
+
+2. **Level-Finding Flaws**  
+   - **Pitfall**: Linear regression on 200 swing-highs may misidentify trends in choppy markets.  
+   - **Guard**: Add R² threshold (>0.7) to discard weak trends. Require ≥5 recent touches (last 4h) for S/R levels.  
+
+3. **Exhaustion Check False Positives**  
+   - **Pitfall**: RSI-7 oversold/overbought signals during news events may trigger premature entries.  
+   - **Guard**: Combine with volume spike check (volume < 0.8× 20-period MA) and exclude high-volatility events (using CoinGecko API for news).  
+
+4. **Liquidation Risk**  
+   - **Pitfall**: 10× leverage on 10% equity per trade risks 100% loss if slippage exceeds SL.  
+   - **Guard**: Dynamic SL at ±0.75% during high ATR (>2× 20-day MA) and reduce leverage to 5×.  
+
+5. **Integration Conflicts**  
+   - **Pitfall**: Macro bias filter may block all scalps if confidence fluctuates near 80%.  
+   - **Guard**: Hysteresis buffer: Require confidence to drop below 70% to lift bias restrictions.  
+
+6. **Telegram Latency**  
+   - **Pitfall**: PNG generation delays signal execution.  
+   - **Guard**: Send signals first via JSON, then async attach PNG using Cloud Tasks.  
+
+---
+
+#### **B. Architecture Proposal**  
+**GCP Services**:  
+1. **Scalp Engine**: Cloud Run (Always-on)  
+   - **Libraries**: `ccxt` (Kraken OHLC), `websockets` (Bybit), `ta` (RSI/ATR), `scikit-learn` (linear regression), `mplfinance` (PNG plots).  
+2. **Macro Engine**: Cloud Function (Timer-driven, existing).  
+3. **Dataflow**: Pub/Sub for inter-engine messaging (e.g., macro bias updates).  
+4. **Storage**: Firestore for positions, levels, and parameters (schema below).  
+5. **Telegram**: Cloud Functions for async image handling.  
+
+**Firestore Schema**:  
+```plaintext
+- positions (collection)
+  │-- pair: "SOLUSDT"
+  │-- type: "SWING" | "SCALP"
+  │-- side: "LONG"
+  │-- entry: 141.20
+  │-- size: 20000  # 10% equity
+  │-- opened_at: timestamp
+
+- macro_bias (collection)
+  │-- pair: "SOLUSDT"
+  │-- bias: "LONG" | "SHORT" | null
+  │-- confidence: 85
+  │-- expires_at: timestamp  # 4h TTL
+
+- scalp_params (document)
+  │-- lookback_swings: 200
+  │-- lookback_candles: 120
+  │-- touch_threshold: 3
+  │-- wick_tolerance: 0.0025  # 0.25%
+  │-- volume_multiplier: 0.8
+```
+
+---
+
+#### **C. Parameter Recommendations & Tuning**  
+1. **Lookback Windows**:  
+   - Swing-highs: **200** (robust for regression).  
+   - 15m candles: **120** (30h window balances reactivity/stability).  
+2. **Touch Threshold**: **≥3 touches** within **0.25%** band (validated if recent 50% occurred in last 8h).  
+3. **Wick Tolerance**: **0.15%** price deviation for "double wick" confirmation.  
+4. **Volume Multiplier**: **<0.75×** 20-period MA (exhaustion). **>1.5×** for continuation invalidation.  
+**Tuning**:  
+   - Use GCP Vertex AI for grid search: Optimize for profit factor (min 1.8) and win rate (min 65%) over 2023–24 BTC data.  
+   - Start with Bybit testnet, adjust wick tolerance ±0.05% weekly.  
+
+---
+
+#### **D. 7-Day Back-Test Plan**  
+**Objective**: Verify **≥2.5% ROI** with **<1.5% max drawdown**.  
+1. **Day 1–2**: **Historical Testing**  
+   - Feed 2024 Q1 data (Bybit/Kraken) to scalp engine.  
+   - Metrics: Win rate, slippage impact, false S/R breaks.  
+2. **Day 3–5**: **Live Paper Trading**  
+   - Run engine in dry mode with real-time feeds.  
+   - Track: Trade frequency, bias filter adherence, latency.  
+3. **Day 6–7**: **Stress Test**  
+   - Simulate black swan (e.g., ±10% moves) and data outages.  
+   - Pass criteria: Zero positions opened during outages; SL triggered within 0.1% of target.  
+**Tools**: Backtrader for historical, custom GCP logger for live metrics.  
+
+---
+
+#### **E. Macro Engine Changes**  
+1. **Expose Bias via Firestore**:  
+   - Publish `macro_bias` on new SWING signals (confidence ≥80) with 4h TTL.  
+2. **Position Tracking**:  
+   - Append live SWING positions to Firestore `positions` collection.  
+3. **New Signal Field**:  
+   - Add `expires_at` to SWING JSON for bias auto-expiry.  
+
+---
+
+### **Effort Estimate & Rationale**  
+- **Development (8 days)**:  
+  - Scalp engine (5d): Level-finder, exhaustion checks, TG integration.  
+  - Macro upgrades (1d): Firestore publishing.  
+  - Backtest setup (2d).  
+- **Testing (5 days)**:  
+  - Parameter tuning (2d), paper trading (3d).  
+- **Rationale**: Prioritizes risk guards (liquidation, data gaps) and leverages GCP’s scalability. Ensures 10× leverage safety via dynamic SL and bias hysteresis.  
+
+**Total**: 13 person-days.  
+**Post-Launch**: Monitor equity drawdown; halt scalps if >5% daily loss.

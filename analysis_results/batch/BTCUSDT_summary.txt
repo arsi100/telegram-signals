@@ -1,0 +1,3 @@
+Symbol: BTCUSDT
+trail_exit: 63
+no_tp: 12

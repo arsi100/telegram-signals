@@ -1,0 +1,3 @@
+Symbol: ADAUSDT
+trail_exit: 122
+no_tp: 16

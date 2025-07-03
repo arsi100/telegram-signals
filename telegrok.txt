@@ -1,0 +1,269 @@
+I’m sorry you’ve been frustrated by this issue, but there’s no need to apologize to me—I’m here to help, and we’ll get this sorted out together. The problem with your Telegram notifier script is that the Pub/Sub messages aren’t triggering the callback, even though the script runs without errors and the test publisher confirms messages are being sent. Let’s debug this step-by-step and fix it. Below is a complete, self-contained solution based on the context you’ve provided.
+
+---
+
+## Problem Overview
+
+Your Python script (`async_telegram_notifier/main.py`) is designed to:
+1. Listen to a Google Cloud Pub/Sub subscription (`telegram-signal-sub`) on the topic `trade-signals-micro`.
+2. When a message is received, send it to a Telegram channel using the `python-telegram-bot` library.
+
+The test publisher (`send_test_signal.py`) successfully publishes messages, but nothing appears in the Telegram channel, and the log file (`notifier.log`) remains empty. This suggests the Pub/Sub callback isn’t being triggered.
+
+---
+
+## Step-by-Step Diagnosis and Fix
+
+### 1. Verify Pub/Sub Configuration
+First, let’s ensure the Pub/Sub setup is correct.
+
+- **Check Subscription-to-Topic Binding**:
+  Run this command to confirm that `telegram-signal-sub` is subscribed to `trade-signals-micro`:
+  ```bash
+  gcloud pubsub topics list-subscriptions trade-signals-micro --project=telegram-signals-205cc
+  ```
+  - **Expected Output**: Should include `telegram-signal-sub`.
+  - **If Missing**: Create the subscription:
+    ```bash
+    gcloud pubsub subscriptions create telegram-signal-sub --topic=trade-signals-micro --project=telegram-signals-205cc
+    ```
+
+- **Check Service Account Permissions**:
+  Verify that the service account `micro-scalp-engine@telegram-signals-205cc.iam.gserviceaccount.com` has the `roles/pubsub.subscriber` role:
+  ```bash
+  gcloud pubsub subscriptions get-iam-policy telegram-signal-sub --project=telegram-signals-205cc
+  ```
+  - **Expected Output**: Look for an entry like:
+    ```yaml
+    - members:
+      - serviceAccount:micro-scalp-engine@telegram-signals-205cc.iam.gserviceaccount.com
+      role: roles/pubsub.subscriber
+    ```
+  - **If Missing**: Grant the role:
+    ```bash
+    gcloud pubsub subscriptions add-iam-policy-binding telegram-signal-sub \
+      --member=serviceAccount:micro-scalp-engine@telegram-signals-205cc.iam.gserviceaccount.com \
+      --role=roles/pubsub.subscriber \
+      --project=telegram-signals-205cc
+    ```
+
+- **Test Message Delivery**:
+  Publish a manual test message:
+  ```bash
+  gcloud pubsub topics publish trade-signals-micro --message='{"test": "hello"}' --project=telegram-signals-205cc
+  ```
+
+### 2. Test Pub/Sub Independently
+The log being empty suggests the callback isn’t firing. Let’s isolate the Pub/Sub listener with a minimal script to confirm messages are receivable.
+
+Create a file `test_pubsub.py` in your project root:
+```python
+from google.cloud import pubsub_v1
+
+PROJECT_ID = "telegram-signals-205cc"
+SUBSCRIPTION_NAME = "telegram-signal-sub"
+
+subscriber = pubsub_v1.SubscriberClient()
+subscription_path = subscriber.subscription_path(PROJECT_ID, SUBSCRIPTION_NAME)
+
+def callback(message):
+    print(f"Received message: {message.data.decode('utf-8')}")
+    message.ack()
+
+print("Listening for messages...")
+future = subscriber.subscribe(subscription_path, callback=callback)
+future.result()
+```
+
+Run it:
+```bash
+python test_pubsub.py
+```
+
+Then publish a test message:
+```bash
+gcloud pubsub topics publish trade-signals-micro --message='{"test": "hello"}' --project=telegram-signals-205cc
+```
+
+- **If Output Appears**: The Pub/Sub setup is fine; the issue is in the notifier script.
+- **If No Output**: Double-check the subscription, topic, and credentials (ensure `GOOGLE_APPLICATION_CREDENTIALS` points to a valid service account file).
+
+### 3. Fix the Notifier Script’s Pub/Sub Integration
+The current script runs the Pub/Sub subscriber in a separate thread with its own asyncio loop, but the loop isn’t actively running because `subscribe` is a synchronous, blocking call. The Telegram bot uses asyncio in the main thread, and the callback’s `asyncio.run_coroutine_threadsafe` schedules coroutines on a loop that isn’t processing them.
+
+#### Problematic Code:
+```python
+def _run_subscriber(self):
+    asyncio.set_event_loop(self._loop)
+    self._future = self._subscriber.subscribe(self._subscription_path, self._callback)
+    self.stop_event.wait()
+```
+- `subscribe` blocks the thread indefinitely.
+- The asyncio loop (`self._loop`) is set but never runs, so coroutines don’t execute.
+
+#### Solution:
+Run the synchronous Pub/Sub subscriber in a separate thread and use a thread-safe queue to pass messages to the main asyncio loop, which is already running via `application.run_polling`.
+
+Here’s the fixed `main.py`:
+```python
+import asyncio
+import json
+import logging
+import os
+import queue
+import threading
+from dotenv import load_dotenv
+from google.cloud import pubsub_v1
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import Application, ApplicationBuilder
+
+# Path Hack
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from functions.telegram_bot import _format_signal_message
+
+# Load environment variables
+load_dotenv()
+
+# Config
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TOPIC_NAME = "trade-signals-micro"
+SUBSCRIPTION_NAME = "telegram-signal-sub"
+
+# Logging setup with file output
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(threadName)s - %(message)s",
+    handlers=[
+        logging.FileHandler("notifier.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class PubSubListener:
+    def __init__(self, application: Application):
+        if not PROJECT_ID:
+            raise ValueError("GCP_PROJECT_ID environment variable not set.")
+        self._subscriber = pubsub_v1.SubscriberClient()
+        self._subscription_path = self._subscriber.subscription_path(PROJECT_ID, SUBSCRIPTION_NAME)
+        self._bot = application.bot
+        self.stop_event = threading.Event()
+        self.message_queue = queue.Queue()
+
+    def _callback(self, message: pubsub_v1.subscriber.message.Message):
+        """Callback for Pub/Sub messages."""
+        logger.info(f"Received Pub/Sub message: {message.message_id}")
+        self.message_queue.put(message)
+        message.ack()
+
+    def _run_subscriber(self):
+        """Run the blocking Pub/Sub subscriber."""
+        logger.info(f"Starting Pub/Sub listener on {self._subscription_path}...")
+        self._future = self._subscriber.subscribe(self._subscription_path, self._callback)
+        self.stop_event.wait()
+        self._future.cancel()
+        self._subscriber.close()
+        logger.info("Pub/Sub listener has shut down.")
+
+    async def process_messages(self):
+        """Process messages from the queue in the asyncio loop."""
+        while True:
+            try:
+                message = self.message_queue.get_nowait()
+                payload = json.loads(message.data.decode("utf-8"))
+                formatted_text = _format_signal_message(payload)
+                if formatted_text:
+                    await self._bot.send_message(
+                        chat_id=CHAT_ID,
+                        text=formatted_text,
+                        parse_mode=ParseMode.HTML
+                    )
+                    logger.info("Sent message to Telegram.")
+                else:
+                    logger.debug(f"Ignored malformed message: {message.message_id}")
+            except queue.Empty:
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                logger.exception(f"Error processing message: {e}")
+
+    def start(self):
+        """Start the subscriber thread."""
+        self.thread = threading.Thread(target=self._run_subscriber, name="PubSubListenerThread")
+        self.thread.start()
+
+    def shutdown(self):
+        """Shut down the subscriber."""
+        logger.info("Shutdown signal received for Pub/Sub listener.")
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join()
+
+async def on_startup(app: Application):
+    listener = PubSubListener(app)
+    listener.start()
+    asyncio.create_task(listener.process_messages())
+    logger.info("Pub/Sub listener and message processor started.")
+
+async def on_shutdown(app: Application):
+    logger.info("Shutting down Pub/Sub listener.")
+    app.bot_data["listener"].shutdown()
+
+def main():
+    if not BOT_TOKEN:
+        logger.critical("TELEGRAM_BOT_TOKEN env var not set.")
+        return
+
+    application = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .post_init(on_startup)
+        .post_shutdown(on_shutdown)
+        .build()
+    )
+    application.bot_data["listener"] = None  # Will be set in on_startup
+
+    logger.info("Starting bot polling...")
+    application.run_polling(allowed_updates=[])
+
+if __name__ == "__main__":
+    main()
+```
+
+**Key Changes**:
+- Added a `queue.Queue` to pass messages from the Pub/Sub thread to the asyncio loop.
+- Introduced `process_messages` as an async method to handle messages in the main loop.
+- Started `process_messages` as a task during startup.
+- Improved logging with file output to `notifier.log`.
+
+### 4. Verify Telegram Configuration
+- **Chat ID**: `-1002318061418` looks like a channel ID (starts with `-100`). Ensure the bot is added to the channel and has permission to post messages.
+- **Test Manually**: Use curl to send a test message:
+  ```bash
+  curl -X POST "https://api.telegram.org/bot7572425494:AAFekRKKEqz_t5HMxjb92jzXluxRIY9-JB8/sendMessage" \
+    -d chat_id="-1002318061418" \
+    -d text="Test message"
+  ```
+  - **Success**: `{"ok":true,...}`
+  - **Failure**: Check bot permissions or chat ID.
+
+### 5. Run and Test
+1. Activate your venv and run the updated script:
+   ```bash
+   source venv/bin/activate
+   python micro_scalp_engine/async_telegram_notifier/main.py
+   ```
+2. Publish a test message with `send_test_signal.py` or the `gcloud` command above.
+3. Check `notifier.log` for logs and the Telegram channel for the message.
+
+---
+
+## Expected Outcome
+- If Pub/Sub is configured correctly, the callback logs to `notifier.log`.
+- Messages appear in the Telegram channel.
+- If issues persist, the logs will pinpoint whether the problem is with Pub/Sub delivery or Telegram sending.
+
+Let me know how this works or if you need further adjustments!

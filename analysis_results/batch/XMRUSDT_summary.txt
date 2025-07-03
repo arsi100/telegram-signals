@@ -1,0 +1,3 @@
+Symbol: XMRUSDT
+trail_exit: 145
+no_tp: 7

@@ -1,0 +1,3 @@
+Symbol: AVAXUSDT
+trail_exit: 117
+no_tp: 14

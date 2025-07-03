@@ -1,0 +1,3 @@
+Symbol: SUIUSDT
+trail_exit: 132
+no_tp: 21

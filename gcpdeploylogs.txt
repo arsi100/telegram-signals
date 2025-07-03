@@ -1,0 +1,268 @@
+[
+  {
+    "textPayload": "starting build \"427a3891-bc4a-47b7-9d02-0e1c6423ae27\"\n",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-0",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27",
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": ""
+      }
+    },
+    "timestamp": "2025-07-03T17:16:46.549390191Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:16:47.619754720Z"
+  },
+  {
+    "textPayload": "FETCHSOURCE",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-1",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:16:46.550048945Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:16:47.619754720Z"
+  },
+  {
+    "textPayload": "Fetching storage object: gs://telegram-signals-205cc_cloudbuild/source/1751562910.733187-ebef27eb1dde46e08bfe800e81d255b9.tgz#1751563005033525",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-2",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:16:46.550078679Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:16:47.619754720Z"
+  },
+  {
+    "textPayload": "Copying gs://telegram-signals-205cc_cloudbuild/source/1751562910.733187-ebef27eb1dde46e08bfe800e81d255b9.tgz#1751563005033525...",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-3",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:16:48.039221021Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "gsutil:STDERR"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:16:48.569794378Z"
+  },
+  {
+    "textPayload": "/ [0 files][    0.0 B/269.5 MiB]                                                \r-\r- [0 files][ 42.8 MiB/269.5 MiB]                                                \r\\\r|\r| [0 files][108.8 MiB/269.5 MiB]                                                \r/\r/ [0 files][175.0 MiB/269.5 MiB]                                                \r-\r\\\r\\ [0 files][243.4 MiB/269.5 MiB]                                                \r|\r| [1 files][269.5 MiB/269.5 MiB]                                                \r",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-4",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_trigger_id": "",
+        "project_id": "telegram-signals-205cc",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:16:52.419692099Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "gsutil:STDERR"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:16:52.587128541Z"
+  },
+  {
+    "textPayload": "Operation completed over 1 objects/269.5 MiB.                                    ",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-5",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:16:52.419705875Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "gsutil:STDERR"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:16:52.587128541Z"
+  },
+  {
+    "textPayload": "BUILD",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-6",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_trigger_id": "",
+        "project_id": "telegram-signals-205cc",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:09.474416167Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:09.566398376Z"
+  },
+  {
+    "textPayload": "Starting Step #0",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-7",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27",
+        "build_trigger_id": "",
+        "project_id": "telegram-signals-205cc"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:10.073329105Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:10.569107840Z"
+  },
+  {
+    "textPayload": "Step #0: Already have image (with digest): gcr.io/cloud-builders/docker",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-8",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_trigger_id": "",
+        "project_id": "telegram-signals-205cc",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:10.079634361Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "Step #0"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:10.569107840Z"
+  },
+  {
+    "textPayload": "Step #0: invalid argument \"gcr.io/telegram-signals-205cc/cloud-fxn-image:\" for \"-t, --tag\" flag: invalid reference format",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-9",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:11.795287819Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "Step #0"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:12.205498506Z"
+  },
+  {
+    "textPayload": "Step #0: See 'docker build --help'.",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-10",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27",
+        "build_trigger_id": "",
+        "project_id": "telegram-signals-205cc"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:11.795316380Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "Step #0"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:12.205498506Z"
+  },
+  {
+    "textPayload": "Finished Step #0",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-11",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27",
+        "project_id": "telegram-signals-205cc"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:12.032183527Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:12.205498506Z"
+  },
+  {
+    "textPayload": "ERROR",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-12",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_trigger_id": "",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27"
+      }
+    },
+    "timestamp": "2025-07-03T17:17:12.032263120Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:12.205498506Z"
+  },
+  {
+    "textPayload": "ERROR: build step 0 \"gcr.io/cloud-builders/docker\" failed: step exited with non-zero status: 125",
+    "insertId": "427a3891-bc4a-47b7-9d02-0e1c6423ae27-13",
+    "resource": {
+      "type": "build",
+      "labels": {
+        "project_id": "telegram-signals-205cc",
+        "build_id": "427a3891-bc4a-47b7-9d02-0e1c6423ae27",
+        "build_trigger_id": ""
+      }
+    },
+    "timestamp": "2025-07-03T17:17:12.032283968Z",
+    "severity": "INFO",
+    "labels": {
+      "build_step": "MAIN"
+    },
+    "logName": "projects/telegram-signals-205cc/logs/cloudbuild",
+    "receiveTimestamp": "2025-07-03T17:17:12.205498506Z"
+  }
+]

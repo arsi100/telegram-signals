@@ -1,0 +1,3 @@
+Symbol: SOLUSDT
+trail_exit: 90
+no_tp: 12

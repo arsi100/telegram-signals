@@ -21,7 +21,8 @@ firebase-admin==6.4.0
 google-generativeai==0.3.2
 
 # Telegram
-python-telegram-bot==20.8
+python-telegram-bot==21.3
+nest-asyncio==1.6.0
 
 # Utilities
 python-dotenv==1.0.1

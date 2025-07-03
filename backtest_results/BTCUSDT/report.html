@@ -1,0 +1,44 @@
+<html><body>
+<h1>Backtest Performance Report</h1>
+<h2>Strategy Parameters</h2>
+<table border="1">
+<tr><td>ema</td><td>10</td></tr>
+<tr><td>rsi_period</td><td>6</td></tr>
+<tr><td>rsi_overbought</td><td>75</td></tr>
+<tr><td>rsi_oversold</td><td>20</td></tr>
+<tr><td>volume_factor</td><td>1.0</td></tr>
+<tr><td>exit_strategy</td><td>fixed</td></tr>
+<tr><td>max_daily_trades</td><td>6</td></tr>
+<tr><td>max_consecutive_losses</td><td>3</td></tr>
+<tr><td>tp_pct</td><td>0.005</td></tr>
+<tr><td>sl_pct</td><td>0.003</td></tr>
+<tr><td>data</td><td>                              close      high  ...      open  volume
+timestamp                                      ...                  
+2025-06-25 01:51:00+00:00  106318.0  106318.1  ...  106318.1   0.393
+2025-06-25 01:52:00+00:00  106299.8  106299.8  ...  106299.8   0.086
+2025-06-25 01:53:00+00:00  106355.9  106355.9  ...  106345.8   0.448
+2025-06-25 02:22:00+00:00  106599.9  106600.0  ...  106599.9   0.731
+2025-06-25 02:23:00+00:00  106569.8  106569.9  ...  106569.8   1.358
+...                             ...       ...  ...       ...     ...
+2025-06-27 09:25:00+00:00  106843.8  106843.8  ...  106843.8   0.188
+2025-06-27 09:46:00+00:00  106996.5  106996.6  ...  106984.1   2.216
+2025-06-27 10:35:00+00:00  106983.1  106983.1  ...  106983.0   0.040
+2025-06-27 10:36:00+00:00  106983.1  106983.1  ...  106983.0   0.821
+2025-06-27 11:05:00+00:00  106991.6  106991.6  ...  106991.6   0.022
+
+[839 rows x 5 columns]</td></tr>
+</table>
+<h2>Performance Metrics</h2>
+<table border="1">
+<tr><td>Total Trades</td><td>36180.00</td></tr>
+<tr><td>Win Rate</td><td>21.70</td></tr>
+<tr><td>Total PnL</td><td>nan</td></tr>
+<tr><td>Average PnL</td><td>nan</td></tr>
+<tr><td>Max Drawdown</td><td>0.00</td></tr>
+<tr><td>Sharpe Ratio</td><td>nan</td></tr>
+<tr><td>Average Trade Duration</td><td>134.93</td></tr>
+</table>
+<h2>Performance Charts</h2>
+<img src="equity_curve.png" /><br/>
+<img src="trade_distributions.png" /><br/>
+</body></html>

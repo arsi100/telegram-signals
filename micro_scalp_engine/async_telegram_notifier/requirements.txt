@@ -1,0 +1,11 @@
+# This file is for the async_telegram_notifier service.
+
+# python-telegram-bot v21 or higher is required for async features.
+# The [job-queue] extra includes the MessageQueue component.
+python-telegram-bot[job-queue]>=21.0
+
+# Google Cloud client for Pub/Sub
+google-cloud-pubsub
+
+# Redis client for mapping trade_ids to message_ids
+redis 

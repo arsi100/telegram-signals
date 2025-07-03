@@ -1,0 +1,3 @@
+Symbol: ETHUSDT
+trail_exit: 123
+no_tp: 12

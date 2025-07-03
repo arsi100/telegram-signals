@@ -1,0 +1,3 @@
+Symbol: LINKUSDT
+trail_exit: 110
+no_tp: 10

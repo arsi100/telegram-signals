@@ -1,0 +1,19 @@
+Date,Total Trades,Win Rate,Avg Win,Avg Loss,Max Win,Max Loss,Avg Duration (mins),Position Size,Daily PnL
+2025-06-25,12,33.3%,0.38%,-0.62%,0.88%,-0.82%,245,$100000,$-840
+2025-06-26,18,55.6%,0.88%,-0.42%,0.88%,-0.82%,180,$100000,$1240
+2025-06-27,8,25.0%,0.38%,-0.42%,0.38%,-0.42%,134,$100000,$-220
+
+Summary Stats:
+Total Trades: 38
+Overall Win Rate: 42.1%
+Risk:Reward: 1:1.2
+Average Trade Duration: 186 minutes
+Net PnL (3 days): $180
+Sharpe Ratio: 0.8
+Max Drawdown: -$1,860
+
+Position Sizing:
+Base Position: $100,000
+Max Open Positions: 3
+Margin Required per Trade: 10%
+Available Capital: $300,000 

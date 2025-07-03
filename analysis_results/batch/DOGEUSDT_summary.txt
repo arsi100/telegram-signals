@@ -1,0 +1,3 @@
+Symbol: DOGEUSDT
+trail_exit: 121
+no_tp: 10

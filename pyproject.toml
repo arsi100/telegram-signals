@@ -1,19 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "repl-nix-workspace"
+name = "micro_scalp_engine"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.11"
+authors = [
+    { name="Your Name", email="your.email@example.com" },
+]
+description = "Cryptocurrency micro scalping engine"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "firebase-admin>=6.7.0",
-    "google-cloud-firestore>=2.20.2",
-    "google-cloud-scheduler>=2.16.1",
-    "google-generativeai>=0.8.5",
-    "numpy>=2.2.5",
-    "python-dotenv>=1.1.0",
-    "pytz>=2025.2",
-    "requests>=2.30.0",
-    "TA-Lib>=0.4.24",
+    "pandas",
+    "numpy",
+    "ccxt",
+    "scikit-learn",
+    "joblib"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8"
 ]
 
 [tool.setuptools]
-packages = ["functions"]
+packages = ["micro_scalp_engine"]

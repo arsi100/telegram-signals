@@ -1,0 +1,167 @@
+I'll help you analyze and plan this crypto trading system enhancement. Let me break this down into the requested sections.
+
+A. SPEC REVIEW & PITFALLS
+
+1. Data Reliability & Latency
+- Pitfall: Relying on multiple data sources (Kraken OHLC + Bybit WebSocket) could lead to data inconsistencies
+- Guard: Implement data validation layer and timestamp reconciliation
+- Guard: Add heartbeat monitoring for WebSocket connections with auto-reconnect
+
+2. Level Detection
+- Pitfall: False S/R levels in choppy markets could trigger excessive trades
+- Guard: Add minimum distance between levels (e.g. 0.5% separation)
+- Guard: Require volume confirmation at S/R touches
+
+3. Risk Management
+- Pitfall: Simultaneous trades across correlated pairs could amplify risk
+- Guard: Add correlation matrix check, reduce position size for correlated pairs
+- Guard: Implement global risk limit (e.g. max 3 concurrent scalps total)
+
+4. Technical Edge Cases
+- Pitfall: Network issues could leave orphaned orders
+- Guard: Implement order state reconciliation every 5 minutes
+- Guard: Add automatic position cleanup for stale trades
+
+B. PROPOSED ARCHITECTURE
+
+Core Components:
+1. Data Pipeline
+```python
+# requirements.txt
+ccxt==4.1.13
+pandas==2.1.1
+numpy==1.24.3
+google-cloud-pubsub==2.18.4
+google-cloud-storage==2.10.0
+```
+
+2. GCP Services
+- Cloud Run: Main scalping engine
+- Cloud Pub/Sub: Event messaging between components
+- Cloud Storage: Store model states and charts
+- Cloud Monitoring: System health & alerts
+
+3. Data Schema
+```python
+# schemas/trade_signal.py
+from pydantic import BaseModel
+
+class ScalpSignal(BaseModel):
+    type: str = "SCALP"
+    pair: str
+    side: str
+    entry: float
+    tp: float
+    sl: float
+    support: list[float]
+    resistance: list[float]
+    trend: dict
+    timestamp: str
+    confidence: float
+    exhaustion_signals: list[str]
+```
+
+C. RECOMMENDED PARAMETERS
+
+Initial values (to be optimized during paper trading):
+
+1. Level Detection
+- Support/Resistance lookback: 120 × 15min candles
+- Touch threshold: 3 touches within 0.25%
+- Minimum level separation: 0.5%
+
+2. Exhaustion Signals
+- RSI-7 thresholds: <20 oversold, >80 overbought
+- Volume spike threshold: 2.5× 20-period average
+- Double wick tolerance: 0.1% maximum wick difference
+
+3. Risk Parameters
+- Position size: 10% equity per trade
+- Maximum concurrent trades: 3
+- Correlation threshold: 0.7 (reduce size if exceeded)
+
+D. PAPER TRADING PLAN
+
+7-Day Test Protocol:
+
+Day 1-2:
+- Data collection & validation
+- Monitor level detection accuracy
+- No trades executed
+
+Day 3-5:
+- Paper trade with base parameters
+- Track win rate, average return, drawdown
+- Log all entry/exit signals
+
+Day 6-7:
+- Parameter optimization
+- Stress test with high volatility periods
+- Integration testing with MACRO engine
+
+Success Metrics:
+- Win rate > 60%
+- Average profit per trade > 0.3%
+- Maximum drawdown < 2%
+- Clean interaction with MACRO signals
+
+E. MACRO ENGINE MODIFICATIONS
+
+Required Changes:
+
+1. Signal Broadcasting
+```python
+# Add to existing macro engine
+def broadcast_macro_state(pair: str, confidence: dict):
+    pubsub_client.publish(
+        topic="macro-state",
+        message={
+            "pair": pair,
+            "long_confidence": confidence["long"],
+            "short_confidence": confidence["short"],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+```
+
+2. Position Management
+```python
+# Add to position manager
+def get_available_margin(pair: str) -> float:
+    macro_position = get_macro_position(pair)
+    if macro_position:
+        return equity * 0.05  # Half size when macro position exists
+    return equity * 0.10
+```
+
+ACTION PLAN & ESTIMATES
+
+Week 1 (Foundation) - 5 days
+- Set up GCP infrastructure
+- Implement data pipeline
+- Build basic level detection
+
+Week 2 (Core Logic) - 5 days
+- Develop entry/exit logic
+- Add risk management
+- Create monitoring dashboard
+
+Week 3 (Integration) - 5 days
+- Connect with MACRO engine
+- Implement paper trading
+- Add Telegram notifications
+
+Week 4 (Testing) - 5 days
+- Paper trading period
+- Parameter optimization
+- Documentation & deployment
+
+Total Estimate: 4 weeks
+
+Rationale:
+- Front-load infrastructure to ensure stability
+- Allocate significant time for testing
+- Build in buffer for unexpected issues
+- Focus on clean integration with existing system
+
+Would you like me to elaborate on any of these sections or proceed with implementing a specific component?

@@ -1,0 +1,10 @@
+SOL – 90-day 1h Opportunity Analysis
+===================================
+
+total_hours: 2000
+total_opportunities: 1906
+avg_opportunities_per_day: 21.177777777777777
+avg_range_pct: 1.1397525685736773
+avg_drawdown_pct: -0.585099511437927
+worst_drawdown_pct: -6.595283452670296
+median_recovery_minutes: 58.9824

@@ -1,0 +1,15 @@
+Price Action Analysis Results
+============================
+
+Analysis Period: 2025-06-29 00:00:00 to 2025-06-30 23:59:59
+
+Return Correlations:
+          SOL       BTC       ETH
+SOL  1.000000  0.684083  0.656566
+BTC  0.684083  1.000000  0.764570
+ETH  0.656566  0.764570  1.000000
+
+Key Observations:
+1. Look for divergences between SOL and BTC/ETH
+2. High volume bars often indicate potential trend changes
+3. Monitor volatility spikes for potential trading opportunities

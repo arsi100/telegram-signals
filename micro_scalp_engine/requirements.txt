@@ -1,0 +1,8 @@
+pybit==5.11.0
+google-cloud-pubsub
+google-cloud-bigquery
+google-cloud-bigtable
+pandas
+websocket-client==1.5.1
+pandas-ta==0.3.14b
+mplfinance

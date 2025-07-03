@@ -1,0 +1,4 @@
+google-cloud-pubsub
+google-cloud-monitoring
+pybit
+aiohttp 

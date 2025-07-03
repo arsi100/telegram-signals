@@ -1,0 +1,3 @@
+Symbol: PENGUUSDT
+trail_exit: 68
+no_tp: 8

@@ -1,0 +1,3 @@
+Symbol: XRPUSDT
+trail_exit: 110
+no_tp: 15

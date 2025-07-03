@@ -1,0 +1,3 @@
+Symbol: HBARUSDT
+trail_exit: 131
+no_tp: 9

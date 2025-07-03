@@ -1,0 +1,18 @@
+{
+  "symbol": "BTCUSDT",
+  "period": {
+    "start": "2025-06-24T22:57:21.607479+00:00",
+    "end": "2025-07-01T22:57:21.607479+00:00"
+  },
+  "best_params": {
+    "ema": 10,
+    "rsi_period": 6,
+    "rsi_overbought": 75,
+    "rsi_oversold": 20,
+    "volume_factor": 1.0,
+    "exit_strategy": "fixed",
+    "max_daily_trades": 6,
+    "max_consecutive_losses": 3,
+    "tp_pct": 0.005,
+    "sl_pct": 0.003,
+    "data": 
