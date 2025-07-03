@@ -52,3 +52,5 @@ options:
 # Test push to GCR for diagnostic - switching from Artifact Registry
 
 # Trigger rebuild comment
+
+# Re-triggering build after enabling Container Registry API.
