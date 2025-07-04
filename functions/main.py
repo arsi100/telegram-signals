@@ -2,6 +2,7 @@
 # Last modified: 2025-05-23 - Fixed logging duplication issue
 # Last modified: 2025-05-21 - Force rebuild for Telegram secret refresh
 # Last modified: 2025-05-21 - Force rebuild
+# Last modified: 2025-07-04 - Fixed send_telegram_message import error
 import functions_framework
 import logging
 import os
@@ -66,7 +67,7 @@ try:
     from .kraken_api import fetch_kline_data
     from .technical_analysis import analyze_technicals
     from .position_manager import get_open_position, record_new_position, update_avg_down_position, close_open_position, record_signal_ts
-    from .telegram_bot import send_telegram_message
+    # REMOVED: from .telegram_bot import send_telegram_message  # Function removed in favor of async notifier
     from .confidence_calculator import get_confidence_score
     from .signal_generator import process_crypto_data
     IMPORTS_SUCCESSFUL = True
@@ -187,9 +188,9 @@ def run_signal_generation(request):
                         signal_data=generated_signal_details # Pass the whole dict here
                     )
                     if pos_id:
-                        send_telegram_message(generated_signal_details)
+                        # DISABLED: send_telegram_message(generated_signal_details)  # Now handled by async notifier
                         record_signal_ts(coin_pair, db) # Record timestamp for new LONG/SHORT
-                        all_results.append(f"{log_message} Saved (ID: {pos_id}) and Notified.")
+                        all_results.append(f"{log_message} Saved (ID: {pos_id}).")  # Removed "and Notified"
                         action_taken = True
                     else:
                         all_results.append(f"{log_message} FAILED to save position.")
@@ -204,9 +205,9 @@ def run_signal_generation(request):
                         logger.error(f"[{coin_pair}] {signal_type} signal received but 'original_position_id' is missing in signal_details: {generated_signal_details}")
                         all_results.append(f"{log_message} {signal_type} FAILED: Missing original_position_id.")
                     elif close_open_position(position_id_to_close, exit_price, db):
-                        send_telegram_message(generated_signal_details)
+                        # DISABLED: send_telegram_message(generated_signal_details)  # Now handled by async notifier
                         # record_signal_ts(coin_pair, db) # Cooldown for exits? Generally no, but can be added.
-                        all_results.append(f"{log_message} Position {position_id_to_close} Closed and Notified.")
+                        all_results.append(f"{log_message} Position {position_id_to_close} Closed.")  # Removed "and Notified"
                         action_taken = True
                     else:
                         all_results.append(f"{log_message} FAILED to close position {position_id_to_close}.")
@@ -218,8 +219,8 @@ def run_signal_generation(request):
                     # def update_avg_down_position(position_id, new_entry_price, additional_quantity_percentage, db)
                     # Passing 0 for additional_quantity_percentage as it's not used by current manager and not in signal_details
                     if position_id_to_update and update_avg_down_position(position_id_to_update, new_entry_price_for_avg, 0, db):
-                        send_telegram_message(generated_signal_details)
-                        all_results.append(f"{log_message} Position {position_id_to_update} Updated and Notified.")
+                        # DISABLED: send_telegram_message(generated_signal_details)  # Now handled by async notifier
+                        all_results.append(f"{log_message} Position {position_id_to_update} Updated.")  # Removed "and Notified"
                         action_taken = True
                     else:
                         all_results.append(f"{log_message} FAILED to update position {position_id_to_update} or missing ID.")
