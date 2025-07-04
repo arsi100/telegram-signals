@@ -23,7 +23,7 @@ steps:
     - --platform=managed
     - --allow-unauthenticated # If you want to trigger it via HTTP
     - --project=$PROJECT_ID
-    - --set-secrets=TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,BYBIT_API_KEY=BYBIT_API_KEY:latest,BYBIT_API_SECRET=BYBIT_API_SECRET:latest,ENV=ENV:latest
+    - --set-secrets=TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,ENV=ENV:latest
 
 # availableSecrets:
 #   secretManager:
