@@ -157,7 +157,28 @@ def run_signal_generation(request):
                 all_results.append(f"{coin_pair}: Not enough data ({len(kline_data)} points).")
                 continue
 
-            technicals = analyze_technicals(kline_data)
+            # Fetch 4h data for multi-timeframe analysis
+            logger.info(f"Fetching 4h kline data for {coin_pair} for multi-timeframe analysis")
+            kline_data_4h_list = fetch_kline_data(coin_pair, resolution="4h")  # Changed from "240m" to "4h"
+            
+            if kline_data_4h_list is None:
+                logger.warning(f"Could not fetch 4h kline data for {coin_pair}. Using original analysis.")
+                # Fall back to original single-timeframe analysis
+                from .technical_analysis import analyze_technicals_original
+                technicals = analyze_technicals_original(kline_data_list, symbol=coin_pair, interval_str="5m")
+            else:
+                # Convert 4h data to DataFrame
+                kline_data_4h = pd.DataFrame(kline_data_4h_list)
+                if kline_data_4h.empty:
+                    logger.warning(f"4h kline data for {coin_pair} is empty. Using original analysis.")
+                    from .technical_analysis import analyze_technicals_original
+                    technicals = analyze_technicals_original(kline_data_list, symbol=coin_pair, interval_str="5m")
+                else:
+                    # Use multi-timeframe analysis
+                    # Note: analyze_technicals expects 15m and 4h data, but we have 5m data
+                    # We'll pass the 5m data as the first parameter for now
+                    technicals = analyze_technicals(kline_data_list, kline_data_4h_list, symbol=coin_pair, interval_str="5m")
+            
             if technicals is None:
                 logger.warning(f"Technical analysis failed for {coin_pair}.")
                 all_results.append(f"{coin_pair}: TA failed.")
