@@ -5,9 +5,17 @@ from pybit.unified_trading import WebSocket
 from google.cloud import pubsub_v1
 import time
 import requests
+import sys
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging with explicit handler
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Global variables that will be initialized in start_data_ingestion
 publisher = None
@@ -41,23 +49,30 @@ def handle_message(message):
             # Publish the message to the Pub/Sub topic
             future = publisher.publish(topic_path, data_bytes)
             future.result()  # Wait for the publish operation to complete
-            logging.info(f"Published message to Pub/Sub: {data_str}")
+            logger.info(f"Published message to Pub/Sub: {data_str[:100]}...")  # Log first 100 chars
         except Exception as e:
-            logging.error(f"Error publishing message to Pub/Sub: {e}")
+            logger.error(f"Error publishing message to Pub/Sub: {e}")
     else:
-        logging.warning("Publisher not initialized, skipping message.")
+        logger.warning("Publisher not initialized, skipping message.")
 
 def start_data_ingestion():
     """Initializes and starts the Bybit WebSocket subscription."""
     global publisher, topic_path
     
+    # Force flush to ensure logs are visible
+    sys.stdout.flush()
+    
     # Initialize Pub/Sub inside the function
-    logging.info("Initializing data ingestion service...")
+    logger.info("="*50)
+    logger.info("STARTING DATA INGESTION SERVICE")
+    logger.info("="*50)
     
     # Get PROJECT_ID with fallbacks
     PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+    logger.info(f"Environment GCP_PROJECT_ID: '{PROJECT_ID}'")
     
     if not PROJECT_ID:
+        logger.info("PROJECT_ID not in environment, trying metadata server...")
         try:
             response = requests.get(
                 "http://metadata.google.internal/computeMetadata/v1/project/project-id",
@@ -66,41 +81,60 @@ def start_data_ingestion():
             )
             if response.status_code == 200:
                 PROJECT_ID = response.text
-                logging.info(f"Retrieved PROJECT_ID from metadata server: {PROJECT_ID}")
+                logger.info(f"Retrieved PROJECT_ID from metadata server: {PROJECT_ID}")
+            else:
+                logger.warning(f"Metadata server returned status {response.status_code}")
         except Exception as e:
-            logging.warning(f"Could not retrieve PROJECT_ID from metadata server: {e}")
+            logger.warning(f"Could not retrieve PROJECT_ID from metadata server: {e}")
     
     if not PROJECT_ID:
         PROJECT_ID = "telegram-signals-205cc"
-        logging.warning(f"Using hardcoded PROJECT_ID: {PROJECT_ID}")
+        logger.warning(f"Using hardcoded PROJECT_ID: {PROJECT_ID}")
     
     TOPIC_NAME = "raw-tick-data-bybit"
     
     # Initialize publisher
-    logging.info(f"Initializing Pub/Sub publisher for project: '{PROJECT_ID}' and topic: '{TOPIC_NAME}'")
+    logger.info(f"Initializing Pub/Sub publisher for project: '{PROJECT_ID}' and topic: '{TOPIC_NAME}'")
     try:
         publisher = pubsub_v1.PublisherClient()
         topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
-        logging.info(f"Successfully initialized Pub/Sub publisher for topic: {topic_path}")
+        logger.info(f"Publisher client created successfully")
+        logger.info(f"Topic path: {topic_path}")
+        
+        # Test publish to verify it works
+        test_message = {"test": True, "timestamp": time.time()}
+        test_future = publisher.publish(topic_path, json.dumps(test_message).encode('utf-8'))
+        test_future.result()
+        logger.info("TEST PUBLISH SUCCESSFUL - Publisher is working!")
+        
     except Exception as e:
-        logging.error(f"FATAL: Failed to initialize Pub/Sub publisher. Exception: {e}", exc_info=True)
+        logger.error(f"FATAL: Failed to initialize Pub/Sub publisher. Exception: {e}", exc_info=True)
+        logger.error("Cannot continue without publisher. Exiting.")
         return
 
     # Initialize WebSocket
-    logging.info("Initializing Bybit WebSocket connection...")
-    ws = WebSocket(testnet=False, channel_type="linear")
-    
-    # Subscribe to the public tickers stream for multiple symbols
-    ws.tickers_stream(
-        symbol=SYMBOLS,
-        callback=handle_message
-    )
-    logging.info(f"Subscribed to tickers for: {', '.join(SYMBOLS)}")
+    logger.info("Initializing Bybit WebSocket connection...")
+    try:
+        ws = WebSocket(testnet=False, channel_type="linear")
+        logger.info("WebSocket client created")
+        
+        # Subscribe to the public tickers stream for multiple symbols
+        ws.tickers_stream(
+            symbol=SYMBOLS,
+            callback=handle_message
+        )
+        logger.info(f"Subscribed to tickers for: {', '.join(SYMBOLS)}")
+    except Exception as e:
+        logger.error(f"Failed to initialize WebSocket: {e}", exc_info=True)
+        return
     
     # Keep the script running
-    logging.info("Data ingestion service is now running...")
+    logger.info("Data ingestion service is now running...")
+    logger.info("="*50)
+    
     while True:
         time.sleep(60)
+        logger.info("Data ingestion service heartbeat - still running...")
 
 if __name__ == "__main__":
     start_data_ingestion()
