@@ -18,14 +18,6 @@ from . import order_execution
 from .macro_integration import MacroIntegration
 
 # --- Configuration ---
-# GCP Configuration
-PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "telegram-signals-205cc")
-SIGNAL_TOPIC_NAME = "trade-signals-micro"
-
-# Bigtable Configuration
-INSTANCE_ID = "cryptotracker-bigtable"
-TABLE_ID = "market-data-1m"
-
 # Trading Configuration
 SYMBOLS_TO_ANALYZE = [
     "BTCUSDT", "SOLUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT", 
@@ -50,31 +42,14 @@ STRATEGY_CONFIG = {
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Clients ---
-logging.info("Attempting to connect to clients...")
-try:
-    bigtable_client = bigtable.Client(project=PROJECT_ID, admin=True)
-    instance = bigtable_client.instance(INSTANCE_ID)
-    table = instance.table(TABLE_ID)
-    logging.info("Successfully connected to Bigtable.")
-except Exception as e:
-    logging.error(f"Failed to connect to Bigtable: {e}")
-    table = None
-
-try:
-    publisher = pubsub_v1.PublisherClient()
-    signal_topic_path = publisher.topic_path(PROJECT_ID, SIGNAL_TOPIC_NAME)
-    logging.info(f"Successfully connected to Pub/Sub topic '{SIGNAL_TOPIC_NAME}'.")
-except Exception as e:
-    logging.error(f"Failed to initialize Pub/Sub publisher: {e}")
-    publisher = None
-logging.info("Client connections attempted.")
+# Global variables that will be initialized in start_logic_engine
+table = None
+publisher = None
+signal_topic_path = None
+macro_integration = None
 
 matplotlib.use("Agg")
 os.makedirs("charts", exist_ok=True)
-
-# Initialize macro integration
-macro_integration = MacroIntegration()
 
 def fetch_recent_data(symbol, lookback_candles=100):
     """Fetches recent candle data from Bigtable."""
@@ -201,18 +176,50 @@ def run_logic_cycle():
         except Exception as e:
             logging.error(f"Error analyzing {symbol}: {e}", exc_info=True)
 
-def main():
-    """Main function to run the logic engine continuously."""
-    if not all([table, publisher]):
-        logging.critical("Exiting: A critical client (Bigtable or Publisher) is not configured.")
+def start_logic_engine():
+    """Starts the logic engine service."""
+    global table, publisher, signal_topic_path, macro_integration
+    
+    logging.info("Initializing logic engine service...")
+    
+    # Get PROJECT_ID
+    PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+    if not PROJECT_ID:
+        PROJECT_ID = "telegram-signals-205cc"
+        logging.warning(f"Using hardcoded PROJECT_ID: {PROJECT_ID}")
+    
+    # Initialize Bigtable
+    INSTANCE_ID = "cryptotracker-bigtable"
+    TABLE_ID = "market-data-1m"
+    try:
+        bigtable_client = bigtable.Client(project=PROJECT_ID, admin=True)
+        instance = bigtable_client.instance(INSTANCE_ID)
+        table = instance.table(TABLE_ID)
+        logging.info("Successfully connected to Bigtable.")
+    except Exception as e:
+        logging.error(f"Failed to connect to Bigtable: {e}")
         return
-        
-    logging.info("Starting MICRO-SCALP Logic Engine...")
+
+    # Initialize Pub/Sub
+    SIGNAL_TOPIC_NAME = "trade-signals-micro"
+    try:
+        publisher = pubsub_v1.PublisherClient()
+        signal_topic_path = publisher.topic_path(PROJECT_ID, SIGNAL_TOPIC_NAME)
+        logging.info(f"Successfully connected to Pub/Sub topic '{SIGNAL_TOPIC_NAME}'.")
+    except Exception as e:
+        logging.error(f"Failed to initialize Pub/Sub publisher: {e}")
+        return
+    
+    # Initialize macro integration
+    macro_integration = MacroIntegration()
     
     # Start the macro bias subscriber
     macro_integration.start_bias_subscriber()
     logging.info("Started macro bias integration")
     
+    logging.info("Starting MICRO-SCALP Logic Engine main loop...")
+    
+    # Run the main analysis loop
     while True:
         try:
             run_logic_cycle()
@@ -221,59 +228,6 @@ def main():
         except Exception as e:
             logging.error(f"Error in main loop: {e}", exc_info=True)
             time.sleep(ANALYSIS_INTERVAL_SECONDS)
-
-def process_tick_data(message: pubsub_v1.subscriber.message.Message):
-    """Callback for processing live tick data."""
-    try:
-        data = json.loads(message.data.decode('utf-8'))
-        symbol = data['data']['symbol']
-        price = float(data['data']['lastPrice'])
-
-        # TODO: This is where the core scalping logic will go
-        # For now, we just log it.
-        logging.info(f"Received tick for {symbol}: {price}")
-
-        # Example: Check for macro bias
-        bias = macro_integration.get_bias(symbol)
-        if bias:
-            logging.info(f"Macro bias for {symbol} is {bias[0]} ({bias[1]}%)")
-        
-        # Example: Check for conflicting positions
-        if macro_integration.has_conflicting_position(symbol, "LONG"):
-            logging.warning(f"Conflicting swing position exists for {symbol}.")
-
-        message.ack()
-    except Exception as e:
-        logging.error(f"Error processing tick data: {e}")
-        message.nack()
-
-def start_logic_engine():
-    """Starts the logic engine service."""
-    if not publisher or not table:
-        logging.critical("Exiting: Publisher or Bigtable client not initialized.")
-        return
-
-    subscriber = pubsub_v1.SubscriberClient()
-    # Subscription to the raw tick data topic
-    tick_sub_path = subscriber.subscription_path(PROJECT_ID, TICK_TOPIC_NAME)
-    
-    try:
-        # Create subscription if it doesn't exist
-        subscriber.create_subscription(name=tick_sub_path, topic=publisher.topic_path(PROJECT_ID, TICK_TOPIC_NAME))
-    except Exception as e:
-        # AlreadyExists is fine
-        if 'AlreadyExists' not in str(e):
-             logging.warning(f"Could not create subscription {tick_sub_path}. It may already exist. Error: {e}")
-
-
-    streaming_pull_future = subscriber.subscribe(tick_sub_path, callback=process_tick_data)
-    logging.info(f"Listening for tick data on {tick_sub_path}...")
-    
-    try:
-        streaming_pull_future.result()
-    except Exception as e:
-        logging.error(f"Logic engine subscriber crashed: {e}")
-        streaming_pull_future.cancel()
 
 if __name__ == '__main__':
     start_logic_engine()

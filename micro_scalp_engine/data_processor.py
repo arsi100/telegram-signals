@@ -9,8 +9,7 @@ import threading
 import time
 
 # --- Configuration ---
-PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-SUBSCRIPTION_NAME = "raw-tick-data-bybit-sub" # A dedicated subscription for this processor
+SUBSCRIPTION_NAME = "raw-tick-data-bybit-sub"
 INSTANCE_ID = "cryptotracker-bigtable"
 TABLE_ID = "market-data-1m"
 COLUMN_FAMILY_ID = "market"
@@ -24,15 +23,8 @@ candle_lock = threading.Lock()
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Bigtable Client ---
-try:
-    bigtable_client = bigtable.Client(project=PROJECT_ID)
-    instance = bigtable_client.instance(INSTANCE_ID)
-    table = instance.table(TABLE_ID)
-    logging.info(f"Successfully connected to Bigtable table '{TABLE_ID}'.")
-except Exception as e:
-    logging.error(f"Failed to connect to Bigtable: {e}")
-    table = None
+# Global variable for table
+table = None
 
 def write_candle_to_bigtable(symbol, timestamp, candle):
     """Writes a completed candle to the Bigtable database."""
@@ -121,8 +113,24 @@ def periodic_flusher():
 
 def start_data_processor():
     """Starts the data processing service."""
-    if not table:
-        logging.critical("Exiting: Bigtable is not configured.")
+    global table
+    
+    logging.info("Initializing data processor service...")
+    
+    # Get PROJECT_ID
+    PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+    if not PROJECT_ID:
+        PROJECT_ID = "telegram-signals-205cc"
+        logging.warning(f"Using hardcoded PROJECT_ID: {PROJECT_ID}")
+    
+    # Initialize Bigtable client
+    try:
+        bigtable_client = bigtable.Client(project=PROJECT_ID)
+        instance = bigtable_client.instance(INSTANCE_ID)
+        table = instance.table(TABLE_ID)
+        logging.info(f"Successfully connected to Bigtable table '{TABLE_ID}'.")
+    except Exception as e:
+        logging.error(f"Failed to connect to Bigtable: {e}")
         return
 
     logging.info(f"Starting data processor, subscribing to '{SUBSCRIPTION_NAME}'...")
