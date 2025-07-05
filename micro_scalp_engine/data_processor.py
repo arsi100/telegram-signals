@@ -1,11 +1,12 @@
 import os
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import TimeoutError
 from google.cloud import pubsub_v1
 from google.cloud import bigtable
 import threading
+import time
 
 # --- Configuration ---
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
@@ -51,72 +52,74 @@ def write_candle_to_bigtable(symbol, timestamp, candle):
     except Exception as e:
         logging.error(f"Failed to write candle for {symbol} to Bigtable: {e}")
 
-def process_message(message: pubsub_v1.subscriber.message.Message) -> None:
-    """Callback function to process each Pub/Sub message."""
+def process_message(message: pubsub_v1.subscriber.message.Message):
+    """Callback function to process incoming tick data."""
     try:
-        data = json.loads(message.data.decode("utf-8"))
+        data_str = message.data.decode("utf-8")
+        data = json.loads(data_str)
         
-        # We only care about the 'data' part of the Bybit message which contains trades
-        trades = data.get("data", [])
-        if not trades:
-            message.ack()
-            return
+        if "topic" in data and data["topic"].startswith("tickers"):
+            tick = data["data"]
+            symbol = tick["symbol"]
+            price = float(tick["lastPrice"])
+            volume = float(tick.get("volume24h", 0))
             
-        # Acquire lock to safely modify the shared active_candles dictionary
-        with candle_lock:
-            for trade in trades:
-                price = float(trade['p'])
-                volume = float(trade['v'])
-                symbol = trade['s']
-                # Bybit timestamp is in milliseconds
-                trade_time = datetime.fromtimestamp(int(trade['T']) / 1000, tz=timezone.utc)
-
-                # Aggregate into 1-minute candles
-                minute_timestamp = int(trade_time.replace(second=0, microsecond=0).timestamp())
-                candle_key = (symbol, minute_timestamp)
-
-                if candle_key not in active_candles:
-                    # If this is the first tick for a new minute, process any old candles
-                    flush_completed_candles(minute_timestamp)
-        
-                    # Start a new candle
-                    active_candles[candle_key] = {
-                        'open': price,
-                        'high': price,
-                        'low': price,
-                        'close': price,
-                        'volume': volume
+            ts = int(data["ts"]) / 1000 # Convert ms to s
+            dt_object = datetime.fromtimestamp(ts, tz=timezone.utc)
+            minute_start_ts = (dt_object.replace(second=0, microsecond=0)).timestamp()
+            
+            key = (symbol, minute_start_ts)
+            
+            with candle_lock:
+                if key not in active_candles:
+                    active_candles[key] = {
+                        "open": price, "high": price, "low": price, "close": price,
+                        "volume": 0, "start_volume": volume, "tick_count": 0
                     }
-                else:
-                    # Update the existing candle
-                    candle = active_candles[candle_key]
-                    candle['high'] = max(candle['high'], price)
-                    candle['low'] = min(candle['low'], price)
-                    candle['close'] = price
-                    candle['volume'] += volume
-
+                
+                candle = active_candles[key]
+                candle["high"] = max(candle["high"], price)
+                candle["low"] = min(candle["low"], price)
+                candle["close"] = price
+                candle["tick_count"] += 1
+                
         message.ack()
     except Exception as e:
-        logging.error(f"Error processing message: {e}", exc_info=True)
+        logging.error(f"Error processing message: {message.data}. Error: {e}", exc_info=True)
         message.nack()
 
-def flush_completed_candles(current_minute_timestamp):
+def flush_candles(force=False):
     """
-    Finds and writes any candles that are now complete.
-    IMPORTANT: This must be called from a block that already holds the candle_lock.
+    Checks for and writes any completed candles to Bigtable.
+    If 'force' is True, writes all candles regardless of completion time.
     """
+    now_ts = datetime.now(timezone.utc).timestamp()
     completed_keys = []
-    # Create a copy of the items to iterate over, which is safer.
-    for (symbol, ts), candle in list(active_candles.items()):
-        if ts < current_minute_timestamp:
-            write_candle_to_bigtable(symbol, ts, candle)
-            completed_keys.append((symbol, ts))
-            
-    # Remove the flushed candles from our active state
-    for key in completed_keys:
-        del active_candles[key]
+    
+    with candle_lock:
+        for key, candle in active_candles.items():
+            symbol, minute_ts = key
+            if force or (now_ts - minute_ts) > 60: # If the candle is over a minute old
+                final_volume = candle.get("volume", 0)
+                candle_to_write = {
+                    "open": candle["open"], "high": candle["high"],
+                    "low": candle["low"], "close": candle["close"],
+                    "volume": final_volume
+                }
+                write_candle_to_bigtable(symbol, minute_ts, candle_to_write)
+                completed_keys.append(key)
+        
+        for key in completed_keys:
+            del active_candles[key]
 
-def main():
+def periodic_flusher():
+    """Runs flush_candles periodically in a background thread."""
+    while True:
+        time.sleep(60) # Run every minute
+        logging.info("Running periodic candle flush...")
+        flush_candles()
+
+def start_data_processor():
     """Starts the data processing service."""
     if not table:
         logging.critical("Exiting: Bigtable is not configured.")
@@ -125,6 +128,10 @@ def main():
     logging.info(f"Starting data processor, subscribing to '{SUBSCRIPTION_NAME}'...")
     subscriber = pubsub_v1.SubscriberClient()
     subscription_path = subscriber.subscription_path(PROJECT_ID, SUBSCRIPTION_NAME)
+
+    # Start the periodic flusher thread
+    flusher_thread = threading.Thread(target=periodic_flusher, daemon=True)
+    flusher_thread.start()
 
     streaming_pull_future = subscriber.subscribe(subscription_path, callback=process_message)
     logging.info(f"Listening for messages on {subscription_path}...")
@@ -139,5 +146,5 @@ def main():
         logging.error(f"Data processor encountered an error: {e}")
         streaming_pull_future.cancel()
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    start_data_processor()

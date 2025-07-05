@@ -3,6 +3,7 @@ import json
 import logging
 from pybit.unified_trading import WebSocket
 from google.cloud import pubsub_v1
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -60,40 +61,27 @@ def handle_message(message):
         logging.warning("Publisher not initialized, skipping message.")
 
 def start_data_ingestion():
-    """
-    Initializes and starts the Bybit WebSocket connection.
-    """
-    logging.info("Starting data ingestion service...")
-    
-    if not PROJECT_ID:
-        logging.error("GCP_PROJECT_ID environment variable not set. Exiting.")
+    """Initializes and starts the Bybit WebSocket subscription."""
+    if not publisher:
+        logging.critical("Exiting: Publisher not initialized.")
         return
 
-    # Initialize the WebSocket client for the public channel
-    # testnet=False uses the mainnet
-    ws = WebSocket(
-        testnet=False,
-        channel_type="linear",
-    )
-
-    # Subscribe to the public trade channel for the specified symbols
-    for symbol in SYMBOLS:
-        ws.trade_stream(
-            symbol=symbol,
-            callback=handle_message
-        )
+    # test=False for real connection, ws_proxy for proxy if needed
+    ws = WebSocket(testnet=False, channel_type="linear")
     
-    logging.info(f"Subscribed to trade streams for: {', '.join(SYMBOLS)}")
-    logging.info("Service is now listening for real-time market data...")
-
-    # The WebSocket client runs in a background thread, so we just keep the main thread alive.
-    # In a real Cloud Run service, the service would just stay running.
-    # For local testing, we can use a simple loop.
+    # Subscribe to the public tickers stream for multiple symbols
+    ws.subscribe_public(
+        symbol=",".join(SYMBOLS),
+        callback=handle_message,
+        topic="tickers"
+    )
+    logging.info(f"Subscribed to tickers for: {', '.join(SYMBOLS)}")
+    
+    # Keep the script running
     while True:
-        pass
+        # The sleep is to prevent the loop from consuming too much CPU.
+        # The WebSocket client runs in its own thread.
+        time.sleep(60)
 
 if __name__ == "__main__":
-    # This block allows the script to be run directly for testing purposes.
-    # In a production Cloud Run environment, you would use a web server like Gunicorn
-    # to run the application and call start_data_ingestion().
     start_data_ingestion()

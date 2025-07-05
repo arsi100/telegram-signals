@@ -222,5 +222,58 @@ def main():
             logging.error(f"Error in main loop: {e}", exc_info=True)
             time.sleep(ANALYSIS_INTERVAL_SECONDS)
 
-if __name__ == "__main__":
-    main()
+def process_tick_data(message: pubsub_v1.subscriber.message.Message):
+    """Callback for processing live tick data."""
+    try:
+        data = json.loads(message.data.decode('utf-8'))
+        symbol = data['data']['symbol']
+        price = float(data['data']['lastPrice'])
+
+        # TODO: This is where the core scalping logic will go
+        # For now, we just log it.
+        logging.info(f"Received tick for {symbol}: {price}")
+
+        # Example: Check for macro bias
+        bias = macro_integration.get_bias(symbol)
+        if bias:
+            logging.info(f"Macro bias for {symbol} is {bias[0]} ({bias[1]}%)")
+        
+        # Example: Check for conflicting positions
+        if macro_integration.has_conflicting_position(symbol, "LONG"):
+            logging.warning(f"Conflicting swing position exists for {symbol}.")
+
+        message.ack()
+    except Exception as e:
+        logging.error(f"Error processing tick data: {e}")
+        message.nack()
+
+def start_logic_engine():
+    """Starts the logic engine service."""
+    if not publisher or not table:
+        logging.critical("Exiting: Publisher or Bigtable client not initialized.")
+        return
+
+    subscriber = pubsub_v1.SubscriberClient()
+    # Subscription to the raw tick data topic
+    tick_sub_path = subscriber.subscription_path(PROJECT_ID, TICK_TOPIC_NAME)
+    
+    try:
+        # Create subscription if it doesn't exist
+        subscriber.create_subscription(name=tick_sub_path, topic=publisher.topic_path(PROJECT_ID, TICK_TOPIC_NAME))
+    except Exception as e:
+        # AlreadyExists is fine
+        if 'AlreadyExists' not in str(e):
+             logging.warning(f"Could not create subscription {tick_sub_path}. It may already exist. Error: {e}")
+
+
+    streaming_pull_future = subscriber.subscribe(tick_sub_path, callback=process_tick_data)
+    logging.info(f"Listening for tick data on {tick_sub_path}...")
+    
+    try:
+        streaming_pull_future.result()
+    except Exception as e:
+        logging.error(f"Logic engine subscriber crashed: {e}")
+        streaming_pull_future.cancel()
+
+if __name__ == '__main__':
+    start_logic_engine()
