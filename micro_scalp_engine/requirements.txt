@@ -28,3 +28,6 @@ redis
 
 # Added from the code block
 mplfinance
+
+# Added from the code block
+scikit-learn
