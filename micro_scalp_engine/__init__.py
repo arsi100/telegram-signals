@@ -1,5 +1,9 @@
 """
 MICRO-SCALP engine package.
+
+This file is intentionally kept minimal. Submodules are imported directly
+by the service_wrapper to prevent premature dependency imports that can
+crash the container before the HTTP server starts.
 """
 
 # Core services that we need
@@ -32,4 +36,4 @@ __all__ = [
 Micro Scalping Engine for Cryptocurrency Trading
 """
 
-__version__ = '0.1.0' 
+__version__ = '0.2.0' 

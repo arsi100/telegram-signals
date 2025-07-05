@@ -2,7 +2,7 @@
 
 # Core
 pandas
-numpy
+numpy<2.0
 
 # Flask for health checks
 flask
