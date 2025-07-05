@@ -26,11 +26,15 @@ SYMBOLS = [
 ]
 
 # --- WebSocket and Pub/Sub Client Initialization ---
+logging.info(f"Attempting to initialize Pub/Sub publisher for project: '{PROJECT_ID}' and topic: '{TOPIC_NAME}'")
 try:
+    if not PROJECT_ID:
+        raise ValueError("GCP_PROJECT_ID environment variable is not set or empty.")
     publisher = pubsub_v1.PublisherClient()
     topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
+    logging.info(f"Successfully initialized Pub/Sub publisher for topic: {topic_path}")
 except Exception as e:
-    logging.error(f"Failed to initialize Pub/Sub publisher: {e}")
+    logging.error(f"FATAL: Failed to initialize Pub/Sub publisher. Exception: {e}", exc_info=True)
     publisher = None
     topic_path = None
 
