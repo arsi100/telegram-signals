@@ -25,3 +25,6 @@ requests
 # Telegram Notifier (Async)
 python-telegram-bot[job-queue]>=21.0
 redis
+
+# Added from the code block
+mplfinance

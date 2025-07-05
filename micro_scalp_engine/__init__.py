@@ -14,11 +14,14 @@ from . import logic_engine
 from . import risk_management
 from . import order_execution
 from . import macro_integration
+from . import entry_logic
+from . import level_finder
+from . import position_tracker
+from . import pattern_recognition
 
 # Commented out modules that cause import errors or aren't needed
 # from . import backtester  # Temporarily disabled due to syntax errors
 # from . import backtest_visualizer  # Temporarily disabled - requires seaborn
-# from . import entry_logic  # Temporarily disabled - numpy compatibility issue
 # from . import level_finder  # Not needed for current services
 # from . import position_tracker  # Not needed for current services
 # from . import pattern_recognition  # Not needed for current services
@@ -29,11 +32,15 @@ __all__ = [
     'logic_engine',
     'risk_management',
     'order_execution',
-    'macro_integration'
+    'macro_integration',
+    'entry_logic',
+    'level_finder',
+    'position_tracker',
+    'pattern_recognition'
 ]
 
 """
 Micro Scalping Engine for Cryptocurrency Trading
 """
 
-__version__ = '0.2.0' 
+__version__ = '0.1.0' 
