@@ -8,9 +8,21 @@ import logging
 from flask import Flask, jsonify
 import signal
 
-# Configure logging
+# Configure logging immediately
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Log startup information
+logger.info("="*50)
+logger.info("Service wrapper starting...")
+logger.info(f"Python version: {sys.version}")
+logger.info(f"Current directory: {os.getcwd()}")
+logger.info(f"Python path: {sys.path}")
+logger.info(f"Environment variables:")
+for key, value in os.environ.items():
+    if key.startswith(('SERVICE_', 'GCP_', 'PORT')):
+        logger.info(f"  {key}={value}")
+logger.info("="*50)
 
 app = Flask(__name__)
 service_healthy = True

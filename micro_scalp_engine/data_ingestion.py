@@ -4,6 +4,7 @@ import logging
 from pybit.unified_trading import WebSocket
 from google.cloud import pubsub_v1
 import time
+import requests
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,6 +13,25 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # GCP Project ID and Pub/Sub Topic Name
 # These should be set as environment variables for security and flexibility.
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+
+# If PROJECT_ID is not set, try to get it from the metadata server (when running on GCP)
+if not PROJECT_ID:
+    try:
+        response = requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/project/project-id",
+            headers={"Metadata-Flavor": "Google"},
+            timeout=2
+        )
+        if response.status_code == 200:
+            PROJECT_ID = response.text
+            logging.info(f"Retrieved PROJECT_ID from metadata server: {PROJECT_ID}")
+    except Exception as e:
+        logging.warning(f"Could not retrieve PROJECT_ID from metadata server: {e}")
+
+if not PROJECT_ID:
+    PROJECT_ID = "telegram-signals-205cc"  # Fallback to hardcoded value
+    logging.warning(f"Using hardcoded PROJECT_ID: {PROJECT_ID}")
+
 TOPIC_NAME = "raw-tick-data-bybit"
 # The symbol(s) to subscribe to for real-time data
 SYMBOLS = [

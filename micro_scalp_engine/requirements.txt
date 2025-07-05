@@ -20,6 +20,7 @@ google-cloud-bigtable
 pandas-ta
 scipy
 matplotlib
+requests
 
 # Telegram Notifier (Async)
 python-telegram-bot[job-queue]>=21.0

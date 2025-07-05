@@ -1,11 +1,19 @@
 steps:
 # Build the Docker image
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/micro-scalp:latest', '-f', 'micro_scalp_engine/Dockerfile.unified', '.']
+  args:
+    - 'build'
+    - '-t'
+    - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/micro-scalp:latest'
+    - '-f'
+    - 'micro_scalp_engine/Dockerfile.unified'
+    - '.'
 
 # Push the Docker image
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/micro-scalp:latest']
+  args:
+    - 'push'
+    - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/micro-scalp:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY 
