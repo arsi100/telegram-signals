@@ -57,12 +57,12 @@ def get_bigtable_table():
             return None
         
         bigtable_client = bigtable.Client(project=project_id, admin=True)
-    instance = bigtable_client.instance(INSTANCE_ID)
-    table = instance.table(TABLE_ID)
+        instance = bigtable_client.instance(INSTANCE_ID)
+        table = instance.table(TABLE_ID)
         logging.info("Successfully connected to Bigtable.")
         return table
-except Exception as e:
-    logging.error(f"Failed to connect to Bigtable: {e}")
+    except Exception as e:
+        logging.error(f"Failed to connect to Bigtable: {e}")
         return None
 
 def fetch_historical_data(symbol: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
@@ -506,7 +506,7 @@ def calculate_pnl(position: dict, exit_price: float) -> float:
     
     return pnl
 
-def calculate_slippage(position_value: float) -> float:
+def calculate_slippage_simple(position_value: float) -> float:
     """
     Calculate slippage based on position size.
     

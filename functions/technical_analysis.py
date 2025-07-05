@@ -75,24 +75,6 @@ def _ensure_dataframe(kline_data_list):
 
     return df
 
-def get_historical_data(symbol, interval, limit, bybit_client=None):
-    """Wrapper to fetch historical kline data."""
-    try:
-        # Directly call the function from the bybit_api module
-        from .bybit_api import fetch_kline_data
-        data_list = fetch_kline_data(symbol=symbol, interval=interval, limit=limit)
-        
-        if data_list:
-            # The fetch function should already return a list of lists/dicts
-            # The API returns in reverse chronological order, so we reverse it
-            return data_list[::-1]
-        else:
-            logger.warning(f"No data returned from fetch_kline_data for {symbol} {interval}")
-            return []
-    except Exception as e:
-        logger.error(f"Error in get_historical_data for {symbol} {interval}: {e}", exc_info=True)
-        return []
-
 def calculate_rsi(df: pd.DataFrame, return_all=False):
     """Calculate Relative Strength Index (RSI) using pandas-ta."""
     try:

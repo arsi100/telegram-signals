@@ -1,1 +1,101 @@
- 
+# This file specifies files that are *not* uploaded to Google Cloud Platform
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+
+.gcloudignore
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+micro_scalp_engine/venv/
+functions/venv/
+
+# Logs
+*.log
+logs/
+logs.md
+
+# Data files
+data/
+candle_cache/
+analysis_results/
+backtest_results/
+charts/
+*.csv
+*.png
+*.jpg
+*.jpeg
+
+# Analysis files
+analysis/
+datadeep.txt
+datagem.txt
+datagrok.txt
+teledeep.txt
+telegem.txt
+telegrok.txt
+deepseekresponse.txt
+clauderesponse.txt
+geminiresponse.txt
+grokresponse.txt
+
+# Documentation
+*.md
+!README.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+temp_*
+tmp/
+*.tmp
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Node modules (if any)
+node_modules/
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Test files
+tests/
+test_*
+
+# Local development
+.env.local
+.env.*.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# GCP deployment logs
+gcpdeploylogs.txt 

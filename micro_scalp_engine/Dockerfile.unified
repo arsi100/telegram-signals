@@ -1,0 +1,29 @@
+# Unified Dockerfile for MICRO-SCALP services
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY micro_scalp_engine/requirements.txt ./requirements.txt
+COPY requirements.txt ./main_requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r main_requirements.txt
+
+# Copy application code
+COPY micro_scalp_engine/ ./micro_scalp_engine/
+COPY . .
+
+# Set Python path
+ENV PYTHONPATH=/app
+ENV PORT=8080
+
+# Run the service wrapper which provides HTTP endpoint and runs the service
+CMD ["python", "-m", "micro_scalp_engine.service_wrapper"] 

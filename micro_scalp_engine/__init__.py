@@ -2,7 +2,7 @@
 MICRO-SCALP engine package.
 """
 
-from . import backtester
+# from . import backtester  # Temporarily disabled due to syntax errors
 from . import backtest_visualizer
 from . import entry_logic
 from . import level_finder
@@ -10,7 +10,7 @@ from . import logic_engine
 from . import position_tracker
 
 __all__ = [
-    'backtester',
+    # 'backtester',  # Temporarily disabled due to syntax errors
     'backtest_visualizer',
     'entry_logic',
     'level_finder',
