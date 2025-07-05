@@ -2,30 +2,30 @@
 MICRO-SCALP engine package.
 """
 
-# from . import backtester  # Temporarily disabled due to syntax errors
-# from . import backtest_visualizer  # Temporarily disabled - requires seaborn
+# Core services that we need
 from . import data_ingestion
 from . import data_processor
-from . import entry_logic
-from . import level_finder
 from . import logic_engine
-from . import position_tracker
-from . import pattern_recognition
+# Support modules needed by logic_engine
 from . import risk_management
 from . import order_execution
+from . import macro_integration
+
+# Commented out modules that cause import errors or aren't needed
+# from . import backtester  # Temporarily disabled due to syntax errors
+# from . import backtest_visualizer  # Temporarily disabled - requires seaborn
+# from . import entry_logic  # Temporarily disabled - numpy compatibility issue
+# from . import level_finder  # Not needed for current services
+# from . import position_tracker  # Not needed for current services
+# from . import pattern_recognition  # Not needed for current services
 
 __all__ = [
     'data_ingestion',
     'data_processor',
     'logic_engine',
-    # 'backtester',  # Temporarily disabled
-    # 'backtest_visualizer',  # Temporarily disabled
-    'entry_logic',
-    'level_finder',
-    'position_tracker',
-    'pattern_recognition',
     'risk_management',
-    'order_execution'
+    'order_execution',
+    'macro_integration'
 ]
 
 """
