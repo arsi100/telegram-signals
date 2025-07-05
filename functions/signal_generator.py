@@ -8,7 +8,7 @@ from google.cloud import firestore
 from typing import Optional, Dict
 
 # Use relative imports
-from .technical_analysis import analyze_technicals, get_historical_data
+from .technical_analysis import analyze_technicals
 from .confidence_calculator import get_confidence_score, should_generate_signal
 from .position_manager import get_open_position, is_in_cooldown_period
 from .sentiment_analysis import get_sentiment_score, get_sentiment_confidence, calculate_directional_sentiment_adjustment
@@ -19,20 +19,17 @@ from .gemini_analyzer import get_gemini_analysis
 # Set up logging
 logger = logging.getLogger(__name__)
 
-def process_crypto_data(symbol: str, db: firestore.Client) -> Optional[Dict]:
+def process_crypto_data(symbol: str, db: firestore.Client, kline_data_15m: pd.DataFrame, kline_data_4h: pd.DataFrame) -> Optional[Dict]:
     """
     Processes crypto data to generate trading signals based on the validated 15m/4h strategy.
     """
     logger.info(f"[{symbol}] Starting signal generation process for 15m/4h strategy.")
 
-    # --- 1. Fetch Data ---
-    # Fetch 200 candles for 15m for indicators and 100 candles for 4h for macro EMA
-    kline_data_15m = get_historical_data(symbol, "15", 200)
-    kline_data_4h = get_historical_data(symbol, "240", 100)
-
-    if not kline_data_15m or not kline_data_4h:
-        logger.warning(f"[{symbol}] Could not fetch sufficient kline data for one or both timeframes. Aborting.")
-        return None
+    # Data is now passed in, no need to fetch.
+    # The check below is now also redundant if we ensure data is passed correctly.
+    # if not kline_data_15m or not kline_data_4h:
+    #     logger.warning(f"[{symbol}] Could not fetch sufficient kline data for one or both timeframes. Aborting.")
+    #     return None
 
     # --- 2. Cooldown and Position Check ---
     if is_in_cooldown_period(symbol, db):

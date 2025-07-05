@@ -186,8 +186,8 @@ def run_signal_generation(request):
 
             # --- Call signal_generator.process_crypto_data ---
             # This function now handles cooldown checks, TA, confidence, and all signal logic (ENTRY, EXIT, AVG_UP/DOWN)
-            # Note: The new process_crypto_data function only takes symbol and db, it fetches its own data
-            generated_signal_details = process_crypto_data(coin_pair, db)
+            # Note: The new process_crypto_data function now accepts the dataframes directly.
+            generated_signal_details = process_crypto_data(coin_pair, db, kline_data, kline_data_4h)
             logger.info(f"[DEBUG MAIN] For {coin_pair}, process_crypto_data returned: {generated_signal_details}")
 
             if generated_signal_details and isinstance(generated_signal_details, dict):
