@@ -119,9 +119,12 @@ def start_data_ingestion():
         ws = WebSocket(testnet=False, channel_type="linear")
         logger.info("WebSocket client created")
         
+        # Build the list of topics to subscribe to
+        topics = [f"tickers.{symbol}" for symbol in SYMBOLS]
+        
         # Subscribe to the public tickers stream for multiple symbols
         ws.subscribe(
-            "tickers.SOLUSDT",
+            topics,
             callback=handle_message
         )
         logger.info(f"Subscribed to tickers for: {', '.join(SYMBOLS)}")
