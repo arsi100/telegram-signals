@@ -56,7 +56,7 @@ def handle_message(message):
     else:
         logger.warning("Publisher not initialized, skipping message.")
 
-def start_data_ingestion():
+async def start_data_ingestion():
     """Initializes and starts the Bybit WebSocket subscription."""
     global publisher, topic_path
     
@@ -137,8 +137,8 @@ def start_data_ingestion():
     logger.info("="*50)
     
     while True:
-        time.sleep(60)
+        await asyncio.sleep(60)
         logger.info("Data ingestion service heartbeat - still running...")
 
 if __name__ == "__main__":
-    start_data_ingestion()
+    asyncio.run(start_data_ingestion())
