@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
+# Cache-busting comment - build triggered at 2025-07-06 01:30:00 UTC
+# FORCE REBUILD WITH SYNCHRONOUS CODE
+
 # Copy requirements
 COPY micro_scalp_engine/requirements.txt ./requirements.txt
 
