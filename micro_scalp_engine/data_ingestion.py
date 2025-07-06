@@ -1,144 +1,132 @@
+"""
+Data ingestion service for the micro scalp engine.
+Connects to Bybit WebSocket and publishes ticker data to Pub/Sub.
+"""
+
 import os
 import json
 import logging
+import sys
 from pybit.unified_trading import WebSocket
 from google.cloud import pubsub_v1
+from datetime import datetime
 import time
-import requests
-import sys
-import asyncio
 
-# Configure logging with explicit handler
+# Configure logging
 logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
 
-# Global variables that will be initialized in start_data_ingestion
+# Configuration
+PROJECT_ID = os.environ.get('GCP_PROJECT', 'telegram-signals-205cc')
+TOPIC_NAME = 'micro-scalp-ticker-data'
+
+# List of symbols to subscribe to
+SYMBOLS = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "DOGEUSDT",
+    "ADAUSDT",
+    "ATOMUSDT",
+    "AVAXUSDT",
+    "CROUSDT",
+    "LDOUSDT",
+    "WLDUSDT",
+    "XRPUSDT"
+]
+
+# Global variables for publisher
 publisher = None
 topic_path = None
 
-# The symbol(s) to subscribe to for real-time data
-SYMBOLS = [
-    "BTCUSDT",
-    "SOLUSDT",
-    "ETHUSDT",
-    "XRPUSDT",
-    "DOGEUSDT",
-    "SEIUSDT",
-    "LINKUSDT",
-    "SUIUSDT",
-    "ADAUSDT"
-]
-
-def handle_message(message):
-    """
-    Callback function to process messages received from the Bybit WebSocket.
-    This function publishes the message to a Google Cloud Pub/Sub topic.
-    """
-    if publisher and topic_path:
-        try:
-            # The message is a dictionary, convert it to a JSON string
-            data_str = json.dumps(message)
-            # Encode the JSON string to bytes, which is required by Pub/Sub
-            data_bytes = data_str.encode("utf-8")
-            
-            # Publish the message to the Pub/Sub topic
-            future = publisher.publish(topic_path, data_bytes)
-            future.result()  # Wait for the publish operation to complete
-            logger.info(f"Published message to Pub/Sub: {data_str[:100]}...")  # Log first 100 chars
-        except Exception as e:
-            logger.error(f"Error publishing message to Pub/Sub: {e}")
-    else:
-        logger.warning("Publisher not initialized, skipping message.")
-
-async def start_data_ingestion():
-    """Initializes and starts the Bybit WebSocket subscription."""
+def initialize_publisher():
+    """Initialize the Pub/Sub publisher."""
     global publisher, topic_path
-    
-    # Force flush to ensure logs are visible
-    sys.stdout.flush()
-    
-    # Initialize Pub/Sub inside the function
-    logger.info("="*50)
-    logger.info("STARTING DATA INGESTION SERVICE")
-    logger.info("="*50)
-    
-    # Get PROJECT_ID with fallbacks
-    PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-    logger.info(f"Environment GCP_PROJECT_ID: '{PROJECT_ID}'")
-    
-    if not PROJECT_ID:
-        logger.info("PROJECT_ID not in environment, trying metadata server...")
-        try:
-            response = requests.get(
-                "http://metadata.google.internal/computeMetadata/v1/project/project-id",
-                headers={"Metadata-Flavor": "Google"},
-                timeout=2
-            )
-            if response.status_code == 200:
-                PROJECT_ID = response.text
-                logger.info(f"Retrieved PROJECT_ID from metadata server: {PROJECT_ID}")
-            else:
-                logger.warning(f"Metadata server returned status {response.status_code}")
-        except Exception as e:
-            logger.warning(f"Could not retrieve PROJECT_ID from metadata server: {e}")
-    
-    if not PROJECT_ID:
-        PROJECT_ID = "telegram-signals-205cc"
-        logger.warning(f"Using hardcoded PROJECT_ID: {PROJECT_ID}")
-    
-    TOPIC_NAME = "raw-tick-data-bybit"
-    
-    # Initialize publisher
-    logger.info(f"Initializing Pub/Sub publisher for project: '{PROJECT_ID}' and topic: '{TOPIC_NAME}'")
     try:
         publisher = pubsub_v1.PublisherClient()
         topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
-        logger.info(f"Publisher client created successfully")
-        logger.info(f"Topic path: {topic_path}")
-        
-        # Test publish to verify it works
-        test_message = {"test": True, "timestamp": time.time()}
-        test_future = publisher.publish(topic_path, json.dumps(test_message).encode('utf-8'))
-        test_future.result()
-        logger.info("TEST PUBLISH SUCCESSFUL - Publisher is working!")
-        
+        logger.info(f"Publisher initialized for topic: {topic_path}")
+        return True
     except Exception as e:
-        logger.error(f"FATAL: Failed to initialize Pub/Sub publisher. Exception: {e}", exc_info=True)
-        logger.error("Cannot continue without publisher. Exiting.")
-        return
+        logger.error(f"Failed to initialize publisher: {e}")
+        return False
 
-    # Initialize WebSocket
-    logger.info("Initializing Bybit WebSocket connection...")
+def handle_message(message):
+    """Callback function to handle incoming WebSocket messages."""
+    try:
+        # Log the raw message for debugging
+        logger.debug(f"Received raw message: {message}")
+        
+        # Extract the ticker data
+        if 'topic' in message and message['topic'].startswith('tickers.'):
+            symbol = message['topic'].replace('tickers.', '')
+            
+            # Prepare the message for Pub/Sub
+            pubsub_message = {
+                'symbol': symbol,
+                'data': message['data'],
+                'timestamp': message.get('ts', int(datetime.utcnow().timestamp() * 1000)),
+                'type': message.get('type', 'snapshot')
+            }
+            
+            # Convert to JSON
+            message_json = json.dumps(pubsub_message)
+            
+            # Publish to Pub/Sub
+            if publisher and topic_path:
+                future = publisher.publish(
+                    topic_path, 
+                    message_json.encode('utf-8'),
+                    symbol=symbol
+                )
+                logger.info(f"Published message to Pub/Sub for {symbol}, message_id: {future.result()}")
+            else:
+                logger.warning("Publisher not initialized, skipping message.")
+    except Exception as e:
+        logger.error(f"Error handling message: {e}")
+
+def start_data_ingestion():
+    """Initializes and starts the Bybit WebSocket subscription."""
+    global publisher, topic_path
+    
+    logger.info("="*50)
+    logger.info("Starting Data Ingestion Service")
+    logger.info("="*50)
+    
+    # Initialize publisher
+    if not initialize_publisher():
+        logger.error("Failed to initialize publisher. Exiting.")
+        return
+    
     try:
         ws = WebSocket(testnet=False, channel_type="linear")
         logger.info("WebSocket client created")
         
-        # Build the list of topics to subscribe to
-        topics = [f"tickers.{symbol}" for symbol in SYMBOLS]
+        # Subscribe to each symbol using the correct ticker_stream method
+        for symbol in SYMBOLS:
+            ws.ticker_stream(
+                symbol=symbol,
+                callback=handle_message
+            )
         
-        # Subscribe to the public tickers stream for multiple symbols
-        ws.subscribe(
-            topics,
-            callback=handle_message
-        )
-        logger.info(f"Subscribed to tickers for: {', '.join(SYMBOLS)}")
+        logger.info(f"Subscription requests sent for: {', '.join(SYMBOLS)}")
     except Exception as e:
-        logger.error(f"Failed to initialize WebSocket: {e}", exc_info=True)
+        logger.error(f"Error setting up WebSocket: {e}")
         return
     
-    # Keep the script running
     logger.info("Data ingestion service is now running...")
     logger.info("="*50)
     
+    # Keep the service running
     while True:
-        await asyncio.sleep(60)
+        time.sleep(60)
         logger.info("Data ingestion service heartbeat - still running...")
 
 if __name__ == "__main__":
-    asyncio.run(start_data_ingestion())
+    start_data_ingestion()
