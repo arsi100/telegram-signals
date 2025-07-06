@@ -9,7 +9,7 @@ import threading
 import time
 
 # --- Configuration ---
-SUBSCRIPTION_NAME = "raw-tick-data-bybit-sub"
+SUBSCRIPTION_NAME = "micro-scalp-ticker-data-processor"
 INSTANCE_ID = "cryptotracker-bigtable"
 TABLE_ID = "market-data-1m"
 COLUMN_FAMILY_ID = "market"
