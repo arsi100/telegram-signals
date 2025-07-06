@@ -6,6 +6,7 @@ from google.cloud import pubsub_v1
 import time
 import requests
 import sys
+import asyncio
 
 # Configure logging with explicit handler
 logging.basicConfig(
@@ -119,8 +120,8 @@ def start_data_ingestion():
         logger.info("WebSocket client created")
         
         # Subscribe to the public tickers stream for multiple symbols
-        ws.tickers_stream(
-            symbol=SYMBOLS,
+        ws.subscribe(
+            "tickers.SOLUSDT",
             callback=handle_message
         )
         logger.info(f"Subscribed to tickers for: {', '.join(SYMBOLS)}")
