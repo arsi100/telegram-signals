@@ -27,4 +27,4 @@ ENV PYTHONPATH=/app
 ENV PORT=8080
 
 # Run the service wrapper which provides HTTP endpoint and runs the service
-CMD ["python", "-m", "micro_scalp_engine.service_wrapper"] 
+CMD ["python", "-m", "micro_scalp_engine.service_wrapper"] # Cache bust Sat Jul  5 22:27:52 EDT 2025
